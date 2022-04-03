@@ -44,11 +44,48 @@ function codeGen(stmt: Stmt) : Array<string> {
   }
 }
 
+
+function op2wasm(op: string): string {
+  switch(op) {
+    case "+":
+      return "i32.add";
+    case "-":
+      return "i32.sub";
+    case "*":
+      return "i32.mul";
+    default:
+      throw new Error("Unsupported op type: " + op);
+  }
+}
+
+
 function codeGenExpr(expr : Expr) : Array<string> {
   switch(expr.tag) {
     case "builtin1":
       const argStmts = codeGenExpr(expr.arg);
-      return argStmts.concat([`(call $${expr.name})`]);
+      if(expr.name == "print") {
+        return argStmts.concat([`(call $${expr.name})`]);
+      } else if (expr.name == "abs") {
+        return argStmts.concat([`(call $${expr.name})`]);
+      } else {
+        throw new Error("Unsupported builtin function: " + expr.name);
+      }
+    case "builtin2":
+      const argStmts1 = codeGenExpr(expr.arg1);
+      const argStmts2 = codeGenExpr(expr.arg2);
+      if(expr.name == "max") {
+        return ["(select "].concat(argStmts1, argStmts2, [`(i32.ge_s)\n)`]);
+      } else if (expr.name == "min") {
+        return ["(select "].concat(argStmts1, argStmts2, [`(i32.le_s)\n)`]);
+      } else if (expr.name == "pow") {
+        return argStmts1.concat(argStmts2, [`(call $${expr.name})`]);
+      } else {
+        throw new Error("Unsupported builtin function: " + expr.name);
+      }
+    case "binary":
+      const leftStmts = codeGenExpr(expr.left);
+      const rightStmts = codeGenExpr(expr.right);
+      return leftStmts.concat(rightStmts, [op2wasm(expr.op)]);
     case "num":
       return ["(i32.const " + expr.value + ")"];
     case "id":

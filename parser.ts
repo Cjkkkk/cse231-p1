@@ -14,6 +14,20 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr {
         tag: "id",
         name: s.substring(c.from, c.to)
       }
+    case "BinaryExpression":
+      c.firstChild();
+      const left1 = traverseExpr(c, s);
+      c.nextSibling(); // go to left
+      const op1 = s.substring(c.from, c.to);
+      c.nextSibling(); // go to right
+      const right1 = traverseExpr(c, s);
+      c.parent();
+      return {
+        tag: "binary",
+        op: op1,
+        left: left1,
+        right: right1
+      }
     case "CallExpression":
       c.firstChild();
       const callName = s.substring(c.from, c.to);
@@ -21,16 +35,30 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr {
       c.firstChild(); // go into arglist
       c.nextSibling(); // find single argument in arglist
       const arg = traverseExpr(c, s);
-      c.parent(); // pop arglist
-      c.parent(); // pop CallExpression
-      return {
-        tag: "builtin1",
-        name: callName,
-        arg: arg
-      };
+      c.nextSibling();
+      if (s.substring(c.from, c.to) == ",") {
+        c.nextSibling();
+        const arg2 = traverseExpr(c, s);
+        c.parent(); // pop arglist
+        c.parent(); // pop CallExpression
+        return {
+          tag: "builtin2",
+          name: callName,
+          arg1: arg,
+          arg2: arg2
+        };
+      } else {
+        c.parent(); // pop arglist
+        c.parent(); // pop CallExpression
+        return {
+          tag: "builtin1",
+          name: callName,
+          arg: arg
+        };
+      }
 
     default:
-      throw new Error("Could not parse expr at " + c.from + " " + c.to + ": " + s.substring(c.from, c.to));
+      throw new Error("Could not parse expr at " + c.type.name + c.from + " " + c.to + ": " + s.substring(c.from, c.to));
   }
 }
 
