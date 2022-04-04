@@ -9,6 +9,7 @@ type CompileResult = {
   wasmSource: string,
 };
 
+var localEnv:LocalEnv = new Map<string, boolean>();
 export function compile(source: string) : CompileResult {
   const ast = parse(source);
   const definedVars = new Set();
@@ -16,6 +17,7 @@ export function compile(source: string) : CompileResult {
     switch(s.tag) {
       case "define":
         definedVars.add(s.name);
+        localEnv.set(s.name, true)
         break;
     }
   }); 
@@ -76,6 +78,9 @@ function codeGenExpr(expr : Expr) : Array<string> {
     case "num":
       return ["(i32.const " + expr.value + ")"];
     case "id":
+      if(!localEnv.has(expr.name)) {
+        throw new Error("ReferenceError: " + expr.name + " is not defined")
+      }
       return [`(local.get $${expr.name})`];
   }
 }

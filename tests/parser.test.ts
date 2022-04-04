@@ -28,10 +28,31 @@ describe('traverseExpr(c, s) function', () => {
 
 describe('traverseStmt(c, s) function', () => {
   // TODO: add tests here to ensure traverseStmt works as expected
+  it('parses a assignment in the beginning', () => {
+    const source = "a = 1";
+    const cursor = parser.parse(source).cursor();
+
+    // go to statement
+    cursor.firstChild();
+    const parsedStmt = traverseStmt(cursor, source);
+
+    // Note: we have to use deep equality when comparing objects
+    expect(parsedStmt).to.deep.equal({ tag: "define", name: "a", value: { tag: "num", value: 1 } });
+  })
 });
 
 describe('traverse(c, s) function', () => {
   // TODO: add tests here to ensure traverse works as expected
+  it('parses a assignment in the beginning', () => {
+    const source = "a = 1";
+    const cursor = parser.parse(source).cursor();
+
+    // go to statement
+    const parsedStmts = traverse(cursor, source);
+
+    // Note: we have to use deep equality when comparing objects
+    expect(parsedStmts).to.deep.equal([{ tag: "define", name: "a", value: { tag: "num", value: 1}}]);
+  })
 });
 
 describe('parse(source) function', () => {
