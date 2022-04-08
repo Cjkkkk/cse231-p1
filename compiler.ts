@@ -37,7 +37,7 @@ export function compile(source: string) : CompileResult {
 
 function codeGen(stmt: Stmt) : Array<string> {
   switch(stmt.tag) {
-    case "define":
+    case "assign":
       var valStmts = codeGenExpr(stmt.value);
       return valStmts.concat([`(local.set $${stmt.name})`]);
     case "expr":
@@ -63,21 +63,14 @@ function op2wasm(op: BinOp): string {
 
 function codeGenExpr(expr : Expr) : Array<string> {
   switch(expr.tag) {
-    case "builtin1":
-      const argStmts = codeGenExpr(expr.arg);
-      return argStmts.concat([`(call $${expr.name})`]);
-    case "builtin2":
-      const argStmts1 = codeGenExpr(expr.arg1);
-      const argStmts2 = codeGenExpr(expr.arg2);
-      return [...argStmts1, ...argStmts2, `(call $${expr.name})`];
     case "binary":
-      const leftStmts = codeGenExpr(expr.left);
-      const rightStmts = codeGenExpr(expr.right);
+      const leftStmts = codeGenExpr(expr.lhs);
+      const rightStmts = codeGenExpr(expr.rhs);
       const opStmt = op2wasm(expr.op);
       return [...leftStmts, ...rightStmts, opStmt];
-    case "num":
+    case "literal":
       return ["(i32.const " + expr.value + ")"];
-    case "id":
+    case "name":
       if(!localEnv.has(expr.name)) {
         throw new Error("ReferenceError: " + expr.name + " is not defined")
       }
