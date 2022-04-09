@@ -3,7 +3,7 @@ import { compile, run } from './compiler';
 
 
 if(process.argv.length != 3) {
-    console.log("Usage: node node-repl.js [filename]")
+    console.log("Usage: node node-main.js [filename]")
     process.exit(1)
 }
 

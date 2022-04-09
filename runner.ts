@@ -14,39 +14,39 @@ import {parse} from './parser';
 // module to figure out what's going on here. It doesn't seem critical for WABT
 // to have this support, so we patch it away.
 if(typeof process !== "undefined") {
-  const oldProcessOn = process.on;
-  process.on = (...args : any) : any => {
-    if(args[0] === "uncaughtException") { return; }
-    else { return oldProcessOn.apply(process, args); }
-  };
+    const oldProcessOn = process.on;
+    process.on = (...args : any) : any => {
+        if(args[0] === "uncaughtException") { return; }
+        else { return oldProcessOn.apply(process, args); }
+    };
 }
 
 export async function run(source : string, config: any) : Promise<number> {
-  const wabtInterface = await wabt();
-  const parsed = parse(source);
-  var returnType = "";
-  var returnExpr = "";
-  const lastExpr = parsed[parsed.length - 1]
-  if(lastExpr.tag === "expr") {
-    returnType = "(result i32)";
-    returnExpr = "(local.get $$last)"
-  }
-  const compiled = compiler.compile(source);
-  const importObject = config.importObject;
-  const wasmSource = `(module
-    (func $print (import "imports" "print") (param i32) (result i32))
-    (func $abs (import "imports" "abs") (param i32) (result i32))
-    (func $max (import "imports" "max") (param i32 i32) (result i32))
-    (func $min (import "imports" "min") (param i32 i32) (result i32))
-    (func $pow (import "imports" "pow") (param i32 i32) (result i32))
-    (func (export "exported_func") ${returnType}
-      ${compiled}
-      ${returnExpr}
-    )
-  )`;
-  const myModule = wabtInterface.parseWat("test.wat", wasmSource);
-  var asBinary = myModule.toBinary({});
-  var wasmModule = await WebAssembly.instantiate(asBinary.buffer, importObject);
-  const result = (wasmModule.instance.exports.exported_func as any)();
-  return result;
+    const wabtInterface = await wabt();
+    const parsed = parse(source);
+    var returnType = "";
+    var returnExpr = "";
+    const lastExpr = parsed[parsed.length - 1]
+    if(lastExpr.tag === "expr") {
+        returnType = "(result i32)";
+        returnExpr = "(local.get $$last)"
+    }
+    const compiled = compiler.compile(source);
+    const importObject = config.importObject;
+    const wasmSource = `(module
+        (func $print (import "imports" "print") (param i32) (result i32))
+        (func $abs (import "imports" "abs") (param i32) (result i32))
+        (func $max (import "imports" "max") (param i32 i32) (result i32))
+        (func $min (import "imports" "min") (param i32 i32) (result i32))
+        (func $pow (import "imports" "pow") (param i32 i32) (result i32))
+        (func (export "exported_func") ${returnType}
+        ${compiled}
+        ${returnExpr}
+        )
+    )`;
+    const myModule = wabtInterface.parseWat("test.wat", wasmSource);
+    var asBinary = myModule.toBinary({});
+    var wasmModule = await WebAssembly.instantiate(asBinary.buffer, importObject);
+    const result = (wasmModule.instance.exports.exported_func as any)();
+    return result;
 }
