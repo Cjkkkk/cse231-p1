@@ -1,6 +1,6 @@
 import {parser} from "lezer-python";
 import {TreeCursor} from "lezer-tree";
-import {BinOp, Expr, Stmt, UniOp, Type, Parameter} from "./ast";
+import {BinOp, Expr, Stmt, UniOp, Type, Parameter, Elif} from "./ast";
 
 export function traverseArgs(c : TreeCursor, s : string) : Array<Expr> {
   var args: Array<Expr> = [];
@@ -53,29 +53,26 @@ export function traverseParameters(c : TreeCursor, s : string) : Array<Parameter
 export function traverseExpr(c : TreeCursor, s : string) : Expr {
   switch(c.type.name) {
     case "Boolean":
-      switch(s.substring(c.from, c.to)) {
-        case "True":
-          return { tag: "literal", value: { tag: "true"} }
-        case "False":
-          return { tag: "literal", value: { tag: "false"} }
-        default:
-          throw new Error("PARSE ERROR: unknown Boolean value")
+      if (s.substring(c.from, c.to) == "True") {
+          return { tag: "literal", value: { tag: "true"} };
+      } else {
+          return { tag: "literal", value: { tag: "false"} };
       }
     case "None":
-      return { tag: "literal", value: { tag: "none"} }
+      return { tag: "literal", value: { tag: "none"} };
     case "Number":
       return { tag: "literal", value: { tag: "num", value: Number(s.substring(c.from, c.to))} }
     case "VariableName":
       return {
         tag: "name",
         name: s.substring(c.from, c.to)
-      }
+      };
     case "ParenthesizedExpression":
       c.firstChild(); // (
       c.nextSibling();
       var rexpr = traverseExpr(c, s);
       c.parent();
-      return rexpr
+      return rexpr;
     case "UnaryExpression":
       c.firstChild();
       var uniOp: UniOp;
@@ -87,7 +84,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr {
           uniOp = UniOp.Neg;
           break;
         default:
-          throw new Error("PARSE ERROR: unknown Unary operator")
+          throw new Error("PARSE ERROR: unknown Unary operator");
       }
       c.nextSibling();
       const expr = traverseExpr(c, s);
@@ -96,7 +93,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr {
         tag: "unary",
         op: uniOp,
         expr: expr
-      } 
+      };
     case "BinaryExpression":
       c.firstChild();
       const left = traverseExpr(c, s);
@@ -141,7 +138,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr {
           break;
         default:
           throw new Error("PARSE ERROR: unknown binary operator")
-      }
+      };
       c.nextSibling(); // go to right
       const right = traverseExpr(c, s);
       c.parent();
@@ -150,7 +147,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr {
         op: op,
         lhs: left,
         rhs: right
-      }
+      };
     case "CallExpression":
       c.firstChild();
       const callName = s.substring(c.from, c.to);
@@ -213,24 +210,26 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt {
     case "IfStatement":
       c.firstChild(); // if
       c.nextSibling(); // if expr
-      var ifExpr = traverseExpr(c, s);
+      var ifCond = traverseExpr(c, s);
       var ifBody = [];
       c.nextSibling(); // if body
       c.firstChild(); // :
       while(c.nextSibling()) {
         ifBody.push(traverseStmt(c, s));
       }
-      
-      return {
-        tag: "if",
-        if_expr: ifExpr,
-        if_body: ifBody
-      }
+      c.parent();
+      c.nextSibling();
+      // if(s.substring(c.from, c.to) == )
+      // return {
+      //   tag: "if",
+      //   ifCond: ifCond,
+      //   ifBody: ifBody
+      // }
     case "WhileStatement":
       var whileBody = [];
       c.firstChild(); // while keyword
       c.nextSibling(); // while expr
-      var whileExpr = traverseExpr(c, s);
+      var whileCond = traverseExpr(c, s);
       c.nextSibling(); // while body
       c.firstChild(); // :
       while(c.nextSibling()) {
@@ -240,7 +239,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt {
       c.parent();
       return {
         tag: "while",
-        expr: whileExpr,
+        cond: whileCond,
         body: whileBody
       }
     case "PassStatement":
