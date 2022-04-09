@@ -43,6 +43,12 @@ elif a7 > 7:
 else:
     a10 = 10
 `
+
+source = `
+x = 1
+x = x + 1
+`
+
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
 console.log(1)
