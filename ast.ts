@@ -1,11 +1,9 @@
-
 export type Parameter = {name: string, type: Type}
-export type Elif = {cond: Expr, body: Array<Stmt>}
 
 export type Stmt =
     { tag: "define", name: string, args: Array<Parameter>, ret: Type, body: Array<Stmt>}
   | { tag: "assign", name: string, value: Expr}
-  | { tag: "if", ifCond: Expr, ifBody: Array<Stmt>, elif: Array<Elif>, elseBody: Array<Stmt>}
+  | { tag: "if", ifCond: Expr, ifBody: Array<Stmt>, elif: Array<{cond: Expr, body: Array<Stmt>}>, elseBody: Array<Stmt>}
   | { tag: "while", cond: Expr, body: Array<Stmt>}
   | { tag: "pass"}
   | { tag: "return", expr: Expr}

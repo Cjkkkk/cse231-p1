@@ -1,6 +1,7 @@
-import {parser} from "lezer-python";
-import {TreeCursor} from "lezer-tree";
+import {parser } from "lezer-python";
+import { TreeCursor } from "lezer-tree";
 import { stringifyTree } from "./treeprinter";
+import { parse } from "./parser";
 
 var source = `
 if a > 1:
@@ -30,18 +31,23 @@ while a > 1:
 
 
 source = `
-if a > 1:
-    a = 1
-    a= 2
-elif a > 1:
-    a = 1
-    a= 2
-elif a > 1:
-    a = 1
-    a= 2
+if a1 > 1:
+    a2 = 2
+    a3 = 3
+elif a4 > 4:
+    a5 = 5
+    a6 = 6
+elif a7 > 7:
+    a8 = 8
+    a9 = 9
 else:
-    a = 1
+    a10 = 10
 `
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
 console.log(1)
+
+
+const stmts = parse(source);
+
+console.log(stmts)
