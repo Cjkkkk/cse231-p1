@@ -31,23 +31,16 @@ while a > 1:
 
 
 source = `
-if a1 > 1:
-    a2 = 2
-    a3 = 3
-elif a4 > 4:
-    a5 = 5
-    a6 = 6
-elif a7 > 7:
-    a8 = 8
-    a9 = 9
+if c > 10:
+    c = 11
 else:
-    a10 = 10
+    c = 22
 `
 
-source = `
-x = 1
-x = x + 1
-`
+// source = `
+// x = 1
+// x = x + 1
+// `
 
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
@@ -57,3 +50,7 @@ console.log(1)
 const stmts = parse(source);
 
 console.log(stmts)
+
+
+type ll = {v: Array<{name:string, age: number}>}
+// l = []

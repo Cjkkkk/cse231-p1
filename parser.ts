@@ -1,7 +1,11 @@
-import { assert } from "chai";
 import {parser} from "lezer-python";
 import {TreeCursor} from "lezer-tree";
 import {BinOp, Expr, Stmt, UniOp, Type, Parameter} from "./ast";
+
+
+function assert(value: boolean) {
+    if(!value) throw new Error("Assertion fail"); 
+}
 
 export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
     var originName = c.node.type.name;
@@ -244,7 +248,6 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 c.parent();
                 elif.push({cond: elifCond, body: elifBody})
             }
-
             // parse else
             if (s.substring(c.from, c.to) == "else") {
                 var elseBody = [];
@@ -263,7 +266,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 ifCond: ifCond,
                 ifBody: ifBody,
                 elif: elif,
-                elseBody: elifBody
+                elseBody: elseBody
             }
         case "WhileStatement":
             var whileBody = [];

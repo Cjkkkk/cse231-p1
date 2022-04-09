@@ -17,27 +17,51 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Body
             return { ...e, a: Type.None };
         }
         case "binary": {
+            const lhs = tcExpr(e.lhs, functions, variables);
+            const rhs = tcExpr(e.rhs, functions, variables);
             switch(e.op) {
-                case BinOp.Plus: return { ...e, a: Type.Int };
-                case BinOp.Minus: return { ...e, a: Type.Int };
-                case BinOp.Mul: return { ...e, a: Type.Int };
-                case BinOp.Div: return { ...e, a: Type.Int };
-                case BinOp.Mod: return { ...e, a: Type.Int };
-                case BinOp.Equal: return { ...e, a: Type.Bool };
-                case BinOp.Unequal: return { ...e, a: Type.Bool };
-                case BinOp.Gt: return { ...e, a: Type.Bool };
-                case BinOp.Ge: return { ...e, a: Type.Bool };
-                case BinOp.Lt: return { ...e, a: Type.Bool };
-                case BinOp.Le: return { ...e, a: Type.Bool };
-                case BinOp.Is: return { ...e, a: Type.Bool };
-                //default: throw new Error(`Unhandled op ${e.op}`)
+                case BinOp.Plus: 
+                case BinOp.Minus:
+                case BinOp.Mul:
+                case BinOp.Div: 
+                case BinOp.Mod:
+                    if (lhs.a != Type.Int || rhs.a != Type.Int) {
+                        throw new Error(`Expected type Int but got type ${lhs.a} and type ${rhs.a}`)
+                    }
+                    return { ...e, a: Type.Int, lhs, rhs};
+                case BinOp.Equal:
+                case BinOp.Unequal:
+                    if (lhs.a != rhs.a) {
+                        throw new Error(`Expected type equality of lhs and rhs but got type ${lhs.a} and type ${rhs.a}`)
+                    }
+                    return { ...e, a: Type.Bool, lhs, rhs};
+                case BinOp.Gt: 
+                case BinOp.Ge:
+                case BinOp.Lt:
+                case BinOp.Le:
+                    if (lhs.a != Type.Int || rhs.a != Type.Int) {
+                        throw new Error(`Expected type Int but got type ${lhs.a} and type ${rhs.a}`)
+                    }
+                    return { ...e, a: Type.Bool, lhs, rhs };
+                case BinOp.Is: 
+                    // todo: fix this
+                    return { ...e, a: Type.Bool, lhs, rhs };
             }
         }
 
         case "unary": {
+            const expr = tcExpr(e.expr, functions, variables);
             switch(e.op) {
-                case UniOp.Not: return { ...e, a: Type.Bool };
-                case UniOp.Neg: return { ...e, a: Type.Int };
+                case UniOp.Not: 
+                    if (expr.a != Type.Bool) {
+                        throw new Error(`Expected type Bool but got type ${expr.a}`)
+                    }
+                    return { ...e, a: Type.Bool, expr: expr };
+                case UniOp.Neg: 
+                    if (expr.a != Type.Int) {
+                        throw new Error(`Expected type Int but got type ${expr.a}`)
+                    }
+                    return { ...e, a: Type.Int, expr: expr };
             }
         }
         case "name": return { ...e, a: variables.get(e.name) };
@@ -67,6 +91,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Body
     }
 }
 
+
 export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : BodyEnv, currentReturn : Type) : Stmt<Type> {
     switch(s.tag) {
         case "assign": {
@@ -82,8 +107,26 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Body
         case "define": {
             const bodyvars = new Map<string, Type>(variables.entries());
             s.params.forEach(p => { bodyvars.set(p.name, p.type)});
-            const newStmts = s.body.map(bs => tcStmt(bs, functions, bodyvars, s.ret));
-            return { ...s, body: newStmts };
+            const newBody = s.body.map(bs => tcStmt(bs, functions, bodyvars, s.ret));
+            return { ...s, body: newBody };
+        }
+
+        case "if": {
+            const newIfCond = tcExpr(s.ifCond, functions, variables);
+            const newIfBody = s.ifBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
+            const newElif = s.elif.map(bs => ({cond: tcExpr(bs.cond, functions, variables), body: bs.body.map(bb => tcStmt(bb, functions, variables, currentReturn))}));
+            const newElseBody = s.elseBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
+            return {...s, ifCond: newIfCond, ifBody: newIfBody, elif: newElif, elseBody: newElseBody}
+        }
+
+        case "while": {
+            const newCond = tcExpr(s.cond, functions, variables);
+            const newBody = s.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
+            return { ...s, cond: newCond, body: newBody };
+        }
+
+        case "pass": {
+            return s;
         }
         case "expr": {
             const ret = tcExpr(s.expr, functions, variables);
