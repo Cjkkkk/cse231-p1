@@ -22,7 +22,7 @@ export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
 
 export function traverseType(c : TreeCursor, s : string) : Type {
     switch(c.type.name) {
-        case "VariableName":
+        case "VariableName": {
             const name = s.substring(c.from, c.to);
             if(name == "int") {
                 return Type.Int;
@@ -30,6 +30,7 @@ export function traverseType(c : TreeCursor, s : string) : Type {
                 return Type.Bool
             }
             throw new Error("Unknown type: " + name)
+        }
         default:
             throw new Error("Unknown type: " + c.type.name)
     }
@@ -61,12 +62,13 @@ export function traverseParameters(c : TreeCursor, s : string) : Array<Parameter
 export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
     var originName = c.node.type.name;
     switch(c.type.name) {
-        case "Boolean":
+        case "Boolean": {
             if (s.substring(c.from, c.to) == "True") {
                 return { tag: "literal", value: { tag: "true"} };
             } else {
                 return { tag: "literal", value: { tag: "false"} };
             }
+        }
         case "None":
             return { tag: "literal", value: { tag: "none"} };
         case "Number":
@@ -76,14 +78,15 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                 tag: "name",
                 name: s.substring(c.from, c.to)
             };
-        case "ParenthesizedExpression":
+        case "ParenthesizedExpression": {
             c.firstChild(); // (
             c.nextSibling();
             var rexpr = traverseExpr(c, s);
             c.parent();
             assert(c.node.type.name == originName);
             return rexpr;
-        case "UnaryExpression":
+        }
+        case "UnaryExpression": {
             c.firstChild();
             var uniOp: UniOp;
             switch(s.substring(c.from, c.to)) {
@@ -105,7 +108,8 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                 op: uniOp,
                 expr: expr
             };
-        case "BinaryExpression":
+        }
+        case "BinaryExpression": {
             c.firstChild();
             const left = traverseExpr(c, s);
             c.nextSibling(); // go to left
@@ -160,7 +164,8 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                 lhs: left,
                 rhs: right
             };
-        case "CallExpression":
+        }
+        case "CallExpression": {
             c.firstChild();
             const callName = s.substring(c.from, c.to);
             c.nextSibling();
@@ -172,6 +177,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                 name: callName,
                 args: args,
             };
+        }
         default:
             throw new Error("Could not parse expr at " + c.type.name + c.from + " " + c.to + ": " + s.substring(c.from, c.to));
     }
@@ -180,7 +186,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
 export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
     var originName = c.node.type.name;
     switch(c.node.type.name) {      
-        case "AssignStatement":
+        case "AssignStatement": {
             c.firstChild(); // go to name
             const vname = s.substring(c.from, c.to);
             c.nextSibling(); // go to equals
@@ -193,7 +199,8 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 name: vname,
                 value: value
             }
-        case "FunctionDefinition":
+        }
+        case "FunctionDefinition": {
             c.firstChild();  // Focus on def
             c.nextSibling(); // Focus on name of function
             var name = s.substring(c.from, c.to);
@@ -223,7 +230,8 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 body: body, 
                 ret: ret
             }
-        case "IfStatement":
+        }
+        case "IfStatement": {
             c.firstChild(); // if
             c.nextSibling(); // if expr
             var ifCond = traverseExpr(c, s);
@@ -268,7 +276,8 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 elif: elif,
                 elseBody: elseBody
             }
-        case "WhileStatement":
+        }
+        case "WhileStatement": {
             var whileBody = [];
             c.firstChild(); // while keyword
             c.nextSibling(); // while expr
@@ -286,10 +295,12 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 cond: whileCond,
                 body: whileBody
             }
-        case "PassStatement":
+        }
+        case "PassStatement": {
             assert(c.node.type.name == originName);
             return { tag: "pass"}
-        case "ReturnStatement":
+        }
+        case "ReturnStatement": {
             c.firstChild(); // return keyword
             var maybeRet = c.nextSibling();
             var returnExpr = undefined;
@@ -299,12 +310,14 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.parent();
             assert(c.node.type.name == originName);
             return { tag: "return", value: returnExpr }
-        case "ExpressionStatement":
+        }
+        case "ExpressionStatement": {
             c.firstChild();
             const expr = traverseExpr(c, s);
             c.parent(); // pop going into stmt
             assert(c.node.type.name == originName);
             return { tag: "expr", expr: expr }
+        }
         default:
             throw new Error("Could not parse stmt at " + c.node.from + " " + c.node.to + ": " + s.substring(c.from, c.to));
     }
@@ -312,7 +325,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
 
 export function traverse(c : TreeCursor, s : string) : Array<Stmt<any>> {
     switch(c.node.type.name) {
-        case "Script":
+        case "Script": {
             const stmts = [];
             c.firstChild();
             do {
@@ -320,6 +333,7 @@ export function traverse(c : TreeCursor, s : string) : Array<Stmt<any>> {
             } while(c.nextSibling())
             console.log("traversed " + stmts.length + " statements ", stmts, "stopped at " , c.node);
             return stmts;
+        }
         default:
             throw new Error("Could not parse program at " + c.node.from + " " + c.node.to);
     }

@@ -65,7 +65,7 @@ export function unaryOpStmts(op : UniOp) {
 
 export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
     switch(expr.tag) {
-        case "literal":
+        case "literal": {
             if( expr.value.tag == "num") {
                 return [`i32.const ${expr.value.value}`];
             } else if (expr.value.tag == "true") {
@@ -76,12 +76,13 @@ export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
                 // TODO: fix none
                 return [`i32.const 0`];
             }
-        case "name":
+        }
+        case "name": {
             // Since we type-checked for making sure all variable exist, here we
             // just check if it's a local variable and assume it is global if not
             if(locals.has(expr.name)) { return [`local.get $${expr.name}`]; }
             else { return [`global.get $${expr.name}`]; }
-        
+        }
         case "unary": {
             var exprs = codeGenExpr(expr.expr, locals);
             if (expr.op == UniOp.Neg) {
@@ -90,25 +91,26 @@ export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
             }
             const opstmts = unaryOpStmts(expr.op);
             return [...exprs, ...opstmts];
-            }
+        }
         case "binary": {
             const lhsExprs = codeGenExpr(expr.lhs, locals);
             const rhsExprs = codeGenExpr(expr.rhs, locals);
             const opstmts = binOpStmts(expr.op);
             return [...lhsExprs, ...rhsExprs, ...opstmts];
-            }
-        case "call":
+        }
+        case "call":{
             const valStmts = expr.args.map(e => codeGenExpr(e, locals)).flat();
             let toCall = expr.name;
             if(expr.name === "print") {
                 switch(expr.args[0].a) {
-                case Type.Bool: toCall = "print_bool"; break;
-                case Type.Int: toCall = "print_num"; break;
-                case Type.None: toCall = "print_none"; break;
+                    case Type.Bool: toCall = "print_bool"; break;
+                    case Type.Int: toCall = "print_num"; break;
+                    case Type.None: toCall = "print_none"; break;
                 }
             }
             valStmts.push(`call $${toCall}`);
             return valStmts;
+        }
     }
 }
 export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
