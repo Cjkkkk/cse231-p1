@@ -1,9 +1,49 @@
+
 import { BinOp, Expr, Stmt, Type, UniOp } from "./ast";
 
 type FunctionsEnv = Map<string, [Type[], Type]>;
 type BodyEnv = Map<string, Type>;
 
-export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : BodyEnv) : Expr<Type> {
+function assert(value: boolean) {
+    if(!value) throw new Error("Assertion fail"); 
+}
+
+function getCurrentVariableScope(variables : BodyEnv[]): BodyEnv {
+    assert(variables.length > 0);
+    return variables[variables.length - 1];
+}
+
+function getCurrentFunctionScope(functions : FunctionsEnv[]): FunctionsEnv {
+    assert(functions.length > 0);
+    return functions[functions.length - 1];
+}
+
+
+function enterNewVariableScope(variables : BodyEnv[]): BodyEnv[] {
+    variables.push(new Map<string, Type>());
+    return variables;
+}
+
+
+function exitCurrentVariableScope(variables : BodyEnv[]): BodyEnv[] {
+    variables.pop();
+    return variables;
+}
+
+
+function enterNewFunctionScope(functions : FunctionsEnv[]): FunctionsEnv[] {
+    functions.push(new Map<string, [Type[], Type]>());
+    return functions;
+}
+
+function exitCurrentFunctionScope(functions : FunctionsEnv[]): FunctionsEnv[] {
+    functions.pop();
+    return functions;
+}
+
+export function tcExpr(e : Expr<any>, functions : FunctionsEnv[], variables : BodyEnv[]) : Expr<Type> {
+    var func = getCurrentFunctionScope(functions);
+    var variable = getCurrentVariableScope(variables);
     switch(e.tag) {
         case "literal":
         if( e.value.tag == "num") {
@@ -64,7 +104,13 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Body
                     return { ...e, a: Type.Int, expr: expr };
             }
         }
-        case "name": return { ...e, a: variables.get(e.name) };
+        case "name": {
+            let [found, t] = lookUpVar(variables, e.name, false);
+            if (!found) {
+                throw new Error(`Reference error: ${e.name} is not defined`)
+            }
+            return { ...e, a: t};
+        }
         case "call":
             if(e.name === "print") {
                 if(e.args.length !== 1) { throw new Error("print expects a single argument"); }
@@ -72,11 +118,12 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Body
                 const res : Expr<Type> = { ...e, a: Type.None, args: newArgs } ;
                 return res;
             }
-            if(!functions.has(e.name)) {
+            let [found, t] = lookUpFunc(functions, e.name, false);
+            if(!found) {
                 throw new Error(`function ${e.name} not found`);
             }
 
-            const [args, ret] = functions.get(e.name);
+            const [args, ret] = t;
             if(args.length !== e.args.length) {
                 throw new Error(`Expected ${args.length} arguments but got ${e.args.length}`);
             }
@@ -92,36 +139,123 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Body
 }
 
 
-export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : BodyEnv, currentReturn : Type) : Stmt<Type> {
+function lookUpVar(variables : BodyEnv[], name: string, current: boolean): [boolean, Type] {
+    var end = current? variables.length - 1: 0;
+    for(var i = variables.length - 1; i >= end; i --) {
+        if(variables[i].has(name)) return [true, variables[i].get(name)];
+    }
+    // throw new Error(`Reference error: variable ${name} is not defined`)
+    return [false, Type.None];
+}
+
+
+function defineNewVar(variables : BodyEnv[], name: string, type: Type) {
+    getCurrentVariableScope(variables).set(name, type);
+}
+
+function lookUpFunc(functions: FunctionsEnv[], name: string, current: boolean): [boolean, [Type[], Type]] {
+    var end = current? functions.length - 1: 0;
+    for(var i = functions.length - 1; i >= end; i --) {
+        if(functions[i].has(name)) return [true, functions[i].get(name)];
+    }
+    // throw new Error(`Reference error: function ${name} is not defined`)
+    return [false, [[], Type.None]];
+}
+
+
+function defineNewFunc(functions: FunctionsEnv[], name: string, sig: [Type[], Type]) {
+    getCurrentFunctionScope(functions).set(name, sig);
+}
+
+export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : BodyEnv[], currentReturn : Type) : Stmt<Type> {
     switch(s.tag) {
-        case "assign": {
+        case "declare": {
             const rhs = tcExpr(s.value, functions, variables);
-            if(variables.has(s.name) && variables.get(s.name) !== rhs.a) {
-                throw new Error(`Cannot assign ${rhs} to ${variables.get(s.name)}`);
+            if ( rhs.a != s.type) {
+                throw new Error(`Incompatible type when declaring variable ${s.name} of type ${s.type} using type ${rhs.a}`)
             }
-            else {
-                variables.set(s.name, rhs.a);
+            let [found, t] = lookUpVar(variables, s.name, true);
+            if (found) {
+                throw new Error(`Redefine variable: ${s.name}`)
             }
+            defineNewVar(variables, s.name, rhs.a);
             return { ...s, value: rhs };
         }
+        case "assign": {
+            const rhs = tcExpr(s.value, functions, variables);
+            let [found, t] = lookUpVar(variables, s.name, false);
+            if (!found) {
+                throw new Error(`Reference error: ${s.name} is not defined`);
+            }
+            if(found && t !== rhs.a) {
+                throw new Error(`Cannot assign ${rhs} to ${t}`);
+            }
+            
+            // variable.set(s.name, rhs.a);
+            return { ...s, value: rhs };
+        }
+
         case "define": {
-            const bodyvars = new Map<string, Type>(variables.entries());
-            s.params.forEach(p => { bodyvars.set(p.name, p.type)});
-            const newBody = s.body.map(bs => tcStmt(bs, functions, bodyvars, s.ret));
+            var func = getCurrentFunctionScope(functions);
+            func.set(s.name, [s.params.map(p => p.type), s.ret]);
+
+            functions = enterNewFunctionScope(functions);
+            variables = enterNewVariableScope(variables);
+
+            s.params.forEach(p => { defineNewVar(variables, p.name, p.type)});
+            const newBody = s.body.map(bs => tcStmt(bs, functions, variables, s.ret));
+            
+            exitCurrentFunctionScope(functions);
+            exitCurrentVariableScope(variables);
             return { ...s, body: newBody };
         }
 
         case "if": {
             const newIfCond = tcExpr(s.ifCond, functions, variables);
+            
+            functions = enterNewFunctionScope(functions);
+            variables = enterNewVariableScope(variables);
             const newIfBody = s.ifBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
-            const newElif = s.elif.map(bs => ({cond: tcExpr(bs.cond, functions, variables), body: bs.body.map(bb => tcStmt(bb, functions, variables, currentReturn))}));
+
+            exitCurrentFunctionScope(functions);
+            exitCurrentVariableScope(variables);
+
+            const newElif = s.elif.map(bs => {
+                let cond = tcExpr(bs.cond, functions, variables);
+                
+                functions = enterNewFunctionScope(functions);
+                variables = enterNewVariableScope(variables);
+
+                let body = bs.body.map(bb => tcStmt(bb, functions, variables, currentReturn))
+
+                exitCurrentFunctionScope(functions);
+                exitCurrentVariableScope(variables);
+                return {
+                    cond: cond, 
+                    body: body
+                }});
+            
+            functions = enterNewFunctionScope(functions);
+            variables = enterNewVariableScope(variables);
+            
             const newElseBody = s.elseBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
+
+            exitCurrentFunctionScope(functions);
+            exitCurrentVariableScope(variables);
+
             return {...s, ifCond: newIfCond, ifBody: newIfBody, elif: newElif, elseBody: newElseBody}
         }
 
         case "while": {
             const newCond = tcExpr(s.cond, functions, variables);
+
+            functions = enterNewFunctionScope(functions);
+            variables = enterNewVariableScope(variables);
+
             const newBody = s.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
+
+            exitCurrentFunctionScope(functions);
+            exitCurrentVariableScope(variables);
             return { ...s, cond: newCond, body: newBody };
         }
 
@@ -143,23 +277,10 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Body
 }
 
 export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
-    const functions = new Map<string, [Type[], Type]>();
-    p.forEach(s => {
-        if(s.tag === "define") {
-            functions.set(s.name, [s.params.map(p => p.type), s.ret]);
-        }
-    });
-
-    const globals = new Map<string, Type>();
+    const functions = [new Map<string, [Type[], Type]>()];
+    const variables = [new Map<string, Type>()];
     return p.map(s => {
-        if(s.tag === "assign") {
-            const rhs = tcExpr(s.value, functions, globals);
-            globals.set(s.name, rhs.a);
-            return { ...s, value: rhs };
-        }
-        else {
-            const res = tcStmt(s, functions, globals, Type.None);
-            return res;
-        }
+        const res = tcStmt(s, functions, variables, Type.None);
+        return res;
     });
 }

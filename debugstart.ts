@@ -37,10 +37,15 @@ else:
     c = 22
 `
 
-// source = `
-// x = 1
-// x = x + 1
-// `
+source = `
+x: int = 1
+x = x + 1
+`
+
+source = `
+def f1(b: int) -> int:
+    return b * 1
+`
 
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
@@ -51,6 +56,6 @@ const stmts = parse(source);
 
 console.log(stmts)
 
-
-type ll = {v: Array<{name:string, age: number}>}
-// l = []
+type BodyEnv = Map<string, number>;
+var v = new Map<string, number>();
+console.log(v.get("a"));

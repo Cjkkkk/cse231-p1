@@ -11,6 +11,7 @@ export type Literal =
 
 export type Stmt<A> =
     { a?: A, tag: "define", name: string, params: Array<Parameter>, ret: Type, body: Array<Stmt<A>>}
+    | { a?: A, tag: "declare", name: string, type: Type, value: Expr<A>}
     | { a?: A, tag: "assign", name: string, value: Expr<A>}
     | { a?: A, tag: "if", ifCond: Expr<A>, ifBody: Array<Stmt<A>>, elif: Array<{cond: Expr<A>, body: Array<Stmt<A>>}>, elseBody: Array<Stmt<A>>}
     | { a?: A, tag: "while", cond: Expr<A>, body: Array<Stmt<A>>}

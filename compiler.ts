@@ -3,13 +3,13 @@ import {Stmt, Expr, Type, BinOp, UniOp} from './ast';
 import {parse} from './parser';
 import { tcProgram } from './tc';
 
-type Env = Map<string, boolean>;
+type Env = Set<string>;
 var loop_label = 0;
 
 function variableNames(stmts: Stmt<Type>[]) : string[] {
     const vars : Array<string> = [];
     stmts.forEach((stmt) => {
-        if(stmt.tag === "assign") { vars.push(stmt.name); }
+        if(stmt.tag === "declare") { vars.push(stmt.name); }
     });
     return vars;
 }
@@ -63,7 +63,7 @@ export function unaryOpStmts(op : UniOp) {
     }
 }
 
-export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
+export function codeGenExpr(expr : Expr<Type>, globals : Env) : Array<string> {
     switch(expr.tag) {
         case "literal": {
             if( expr.value.tag == "num") {
@@ -80,26 +80,26 @@ export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
         case "name": {
             // Since we type-checked for making sure all variable exist, here we
             // just check if it's a local variable and assume it is global if not
-            if(locals.has(expr.name)) { return [`local.get $${expr.name}`]; }
-            else { return [`global.get $${expr.name}`]; }
+            if(globals.has(expr.name)) { return [`global.get $${expr.name}`]; }
+            else { return [`local.get $${expr.name}`]; }
         }
         case "unary": {
-            var exprs = codeGenExpr(expr.expr, locals);
+            var exprs = codeGenExpr(expr.expr, globals);
             if (expr.op == UniOp.Neg) {
                 // does not have i32.neg
-                exprs = codeGenExpr({tag: "literal", value: {tag: "num", value: 0}}, locals).concat(exprs);
+                exprs = codeGenExpr({tag: "literal", value: {tag: "num", value: 0}}, globals).concat(exprs);
             }
             const opstmts = unaryOpStmts(expr.op);
             return [...exprs, ...opstmts];
         }
         case "binary": {
-            const lhsExprs = codeGenExpr(expr.lhs, locals);
-            const rhsExprs = codeGenExpr(expr.rhs, locals);
+            const lhsExprs = codeGenExpr(expr.lhs, globals);
+            const rhsExprs = codeGenExpr(expr.rhs, globals);
             const opstmts = binOpStmts(expr.op);
             return [...lhsExprs, ...rhsExprs, ...opstmts];
         }
         case "call":{
-            const valStmts = expr.args.map(e => codeGenExpr(e, locals)).flat();
+            const valStmts = expr.args.map(e => codeGenExpr(e, globals)).flat();
             let toCall = expr.name;
             if(expr.name === "print") {
                 switch(expr.args[0].a) {
@@ -113,21 +113,16 @@ export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
         }
     }
 }
-export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
+export function codeGenStmt(stmt : Stmt<Type>, globals : Env) : Array<string> {
     switch(stmt.tag) {
         case "define": {
-            const withParamsAndVariables = new Map<string, boolean>(locals.entries());
-
             // Construct the environment for the function body
-            const variables = variableNames(stmt.body);
-            variables.forEach(v => withParamsAndVariables.set(v, true));
-            stmt.params.forEach(p => withParamsAndVariables.set(p.name, true));
-
+            const locals = variableNames(stmt.body);
             // Construct the code for params and variable declarations in the body
             const params = stmt.params.map(p => `(param $${p.name} i32)`);
-            const varDecls = variables.map(v => `(local $${v} i32)`);
+            const varDecls = locals.map(v => `(local $${v} i32)`);
 
-            const stmts = stmt.body.map(s => codeGenStmt(s, withParamsAndVariables)).flat();
+            const stmts = stmt.body.map(s => codeGenStmt(s, globals)).flat();
             return [`(func $${stmt.name} ${params} (result i32)`,
                     `(local $scratch i32)`,
                     ...varDecls,
@@ -135,28 +130,42 @@ export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
                     `i32.const 0`,
                     `)`];
         }
+        case "declare":
+            // TODO:
+            // add (local $) here
         case "assign": {
-            var valStmts = codeGenExpr(stmt.value, locals);
-            if(locals.has(stmt.name)) { valStmts.push(`local.set $${stmt.name}`); }
-            else { valStmts.push(`global.set $${stmt.name}`); }
+            var valStmts = codeGenExpr(stmt.value, globals);
+            if(globals.has(stmt.name)) { valStmts.push(`global.set $${stmt.name}`); }
+            else { valStmts.push(`local.set $${stmt.name}`); }
             return valStmts;
         }
         case "if": {
             var result = [];
-            var ifCond = codeGenExpr(stmt.ifCond, locals);
-            var ifBody = stmt.ifBody.map((v) => codeGenStmt(v, locals)).flat();
+            var ifCond = codeGenExpr(stmt.ifCond, globals);
+
+            var locals = variableNames(stmt.ifBody);
+            var varDecls = locals.map(v => `(local $${v} i32)`);
+
+            var ifBody = stmt.ifBody.map((v) => codeGenStmt(v, globals)).flat();
             var enclosingCount = 0;
-            result.push(...ifCond, `(if`, `(then`, ...ifBody, `)`);
+            result.push(...ifCond, `(if`, `(then`, ...varDecls, ...ifBody, `)`);
             enclosingCount += 1;
             for(var elif of stmt.elif) {
-                var elifCond = codeGenExpr(elif.cond, locals);
-                var elifBody = elif.body.map((v) => codeGenStmt(v, locals)).flat();;
-                result.push(`(else`, ...elifCond, `(if`, `(then`, ...elifBody, `)`);
+                var elifCond = codeGenExpr(elif.cond, globals);
+
+                var locals = variableNames(elif.body);
+                var varDecls = locals.map(v => `(local $${v} i32)`);
+
+                var elifBody = elif.body.map((v) => codeGenStmt(v, globals)).flat();;
+                result.push(`(else`, ...elifCond, `(if`, `(then`, ...varDecls, ...elifBody, `)`);
                 enclosingCount += 2;
             }
             
-            var elseBody = stmt.elseBody.map((v) => codeGenStmt(v, locals)).flat();
-            result.push(`(else`, ...elseBody, `)`, ...Array(enclosingCount).fill(")"));
+            var locals = variableNames(stmt.elseBody);
+            var varDecls = locals.map(v => `(local $${v} i32)`);
+
+            var elseBody = stmt.elseBody.map((v) => codeGenStmt(v, globals)).flat();
+            result.push(`(else`, ...varDecls, ...elseBody, `)`, ...Array(enclosingCount).fill(")"));
             return result;
         }
         case "while": {
@@ -164,13 +173,18 @@ export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
             loop_label += 1;
             var bodyLabel = loop_label;
             loop_label += 1;
-            var condExpr = codeGenExpr(stmt.cond, locals);
-            var bodyStmts = stmt.body.map(s => codeGenStmt(s, locals)).flat();
+            var condExpr = codeGenExpr(stmt.cond, globals);
+
+            var locals = variableNames(stmt.body);
+            var varDecls = locals.map(v => `(local $${v} i32)`);
+
+            var bodyStmts = stmt.body.map(s => codeGenStmt(s, globals)).flat();
             return [`(block $label_${bodyLabel}`,
                     `(loop $label_${condLabel}`,
                     ...condExpr,
                     `i32.eqz`,
                     `br_if $label_${bodyLabel}`,
+                    ...varDecls,
                     ...bodyStmts,
                     `br $label_${condLabel}`,`)`,`)`];
         }
@@ -178,12 +192,12 @@ export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
             return [`nop`];
         }
         case "return": {
-            var valStmts = codeGenExpr(stmt.value, locals);
+            var valStmts = codeGenExpr(stmt.value, globals);
             valStmts.push(`return`);
             return valStmts;
         }
         case "expr": {
-            const result = codeGenExpr(stmt.expr, locals);
+            const result = codeGenExpr(stmt.expr, globals);
             result.push(`local.set $scratch`);
             return result;
         }
@@ -213,14 +227,14 @@ function addIndent(stmts: Array<string>, ident: number) :Array<string> {
 export function compile(source : string) : string {
     let ast = parse(source);
     ast = tcProgram(ast);
-    const emptyEnv = new Map<string, boolean>();
     const [vars, funs, stmts] = varsFunsStmts(ast);
     
-    const funsCode : string[] = funs.map(f => addIndent(codeGenStmt(f, emptyEnv), 1)).map(f => f.join("\n"));
+    const globals = new Set<string>(vars);
+    const funsCode : string[] = funs.map(f => addIndent(codeGenStmt(f, globals), 1)).map(f => f.join("\n"));
     const allFuns = funsCode.join("\n\n");
     const varDecls = addIndent(vars.map(v => `(global $${v} (mut i32) (i32.const 0))`), 1).join("\n");
 
-    const allStmts = stmts.map(s => codeGenStmt(s, emptyEnv)).flat();
+    const allStmts = stmts.map(s => codeGenStmt(s, globals)).flat();
 
     const lastStmt = ast[ast.length - 1];
     const isExpr = lastStmt.tag === "expr";

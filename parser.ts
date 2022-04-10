@@ -189,11 +189,29 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
         case "AssignStatement": {
             c.firstChild(); // go to name
             const vname = s.substring(c.from, c.to);
-            c.nextSibling(); // go to equals
+            c.nextSibling(); // go to equals or typedef
+            var ret : Type;
+            var isDeclare = false;
+            if (c.type.name === "TypeDef") {
+                c.firstChild();
+                c.nextSibling()
+                ret = traverseType(c, s);
+                isDeclare = true;
+                c.parent();
+                c.nextSibling(); // go to equals
+            }
             c.nextSibling(); // go to value
             const value = traverseExpr(c, s);
             c.parent();
             assert(c.node.type.name == originName);
+            if(isDeclare) {
+                return {
+                    tag: "declare",
+                    name: vname,
+                    type: ret,
+                    value: value
+                }
+            }
             return {
                 tag: "assign",
                 name: vname,
@@ -257,8 +275,8 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 elif.push({cond: elifCond, body: elifBody})
             }
             // parse else
+            var elseBody = [];
             if (s.substring(c.from, c.to) == "else") {
-                var elseBody = [];
                 c.nextSibling(); // elif body
                 c.firstChild(); // :
                 while(c.nextSibling()) {
