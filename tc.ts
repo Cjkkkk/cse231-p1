@@ -181,6 +181,8 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
             defineNewVar(variables, s.name, rhs.a);
             return { ...s, value: rhs };
         }
+
+        
         case "assign": {
             const rhs = tcExpr(s.value, functions, variables);
             let [found, t] = lookUpVar(variables, s.name, false);
@@ -202,6 +204,8 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
             variables = enterNewVariableScope(variables);
 
             s.params.forEach(p => { defineNewVar(variables, p.name, p.type)});
+
+            checkDefinition(s.body);
             const newBody = s.body.map(bs => tcStmt(bs, functions, variables, s.ret));
             
             exitCurrentFunctionScope(functions);
@@ -275,9 +279,28 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
     }
 }
 
+export function checkDefinition(p : Stmt<any>[]) {
+    var LastDeclare = -1;
+    var firstStmt = p.length;
+    for(var i = 0; i < p.length; i ++) {
+        if (p[i].tag == "declare" || p[i].tag == "define") {
+            LastDeclare = i;
+        } else {
+            firstStmt = i;
+        }
+
+        if (LastDeclare > firstStmt) {
+            throw new Error("Can not define variable and func after")
+        }
+    }
+}
+
+
 export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
     const functions = [new Map<string, [Type[], Type]>()];
     const variables = [new Map<string, Type>()];
+
+    checkDefinition(p);
     return p.map(s => {
         const res = tcStmt(s, functions, variables, Type.None);
         return res;

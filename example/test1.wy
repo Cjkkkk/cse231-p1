@@ -1,4 +1,9 @@
-def f2():
+def f1():
+    test: int = 1
     return
 
-f2()
+x: int = 5
+y: int = 6
+
+x = x + 1
+print(x)
