@@ -38,34 +38,4 @@ const importObject = {
     output: ""
 };
 
-run(`
-(module
-    (func $print_num (import "imports" "print_num") (param i32) (result i32))
-    (func $print_bool (import "imports" "print_bool") (param i32) (result i32))
-    (func $print_none (import "imports" "print_none") (param i32) (result i32))
-    (global $a (mut i32) (i32.const 0))
-    (global $b (mut i32) (i32.const 0))
-
-    (func (export "_start") (result i32)
-        (local $scratch i32)
-        (local $b i32)
-        i32.const 1
-        global.set $a
-        i32.const 2
-        global.set $b
-        global.get $a
-        i32.const 100
-        i32.lt_s
-        (if
-            (then
-                i32.const 3
-                global.set $b
-            )
-            (else
-            )
-        )
-        global.get $b
-        local.set $scratch
-        local.get $scratch
-    )
-) `, importObject).then((v) => console.log(v))
+run(wasmSource, importObject).then((v) => console.log(v))

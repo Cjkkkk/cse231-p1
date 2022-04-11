@@ -1,5 +1,4 @@
-b: int = f(1)
-def f(a: int) -> int:
-    return a + 1
+def f2():
+    return
 
-b
+f2()

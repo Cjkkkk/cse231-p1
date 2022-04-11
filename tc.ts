@@ -196,8 +196,7 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
         }
 
         case "define": {
-            var func = getCurrentFunctionScope(functions);
-            func.set(s.name, [s.params.map(p => p.type), s.ret]);
+            defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
 
             functions = enterNewFunctionScope(functions);
             variables = enterNewVariableScope(variables);
@@ -213,35 +212,35 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
         case "if": {
             const newIfCond = tcExpr(s.ifCond, functions, variables);
             
-            functions = enterNewFunctionScope(functions);
-            variables = enterNewVariableScope(variables);
+            // functions = enterNewFunctionScope(functions);
+            // variables = enterNewVariableScope(variables);
             const newIfBody = s.ifBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
 
-            exitCurrentFunctionScope(functions);
-            exitCurrentVariableScope(variables);
+            // exitCurrentFunctionScope(functions);
+            // exitCurrentVariableScope(variables);
 
             const newElif = s.elif.map(bs => {
                 let cond = tcExpr(bs.cond, functions, variables);
                 
-                functions = enterNewFunctionScope(functions);
-                variables = enterNewVariableScope(variables);
+                // functions = enterNewFunctionScope(functions);
+                // variables = enterNewVariableScope(variables);
 
                 let body = bs.body.map(bb => tcStmt(bb, functions, variables, currentReturn))
 
-                exitCurrentFunctionScope(functions);
-                exitCurrentVariableScope(variables);
+                // exitCurrentFunctionScope(functions);
+                // exitCurrentVariableScope(variables);
                 return {
                     cond: cond, 
                     body: body
                 }});
             
-            functions = enterNewFunctionScope(functions);
-            variables = enterNewVariableScope(variables);
+            // functions = enterNewFunctionScope(functions);
+            // variables = enterNewVariableScope(variables);
             
             const newElseBody = s.elseBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
 
-            exitCurrentFunctionScope(functions);
-            exitCurrentVariableScope(variables);
+            // exitCurrentFunctionScope(functions);
+            // exitCurrentVariableScope(variables);
 
             return {...s, ifCond: newIfCond, ifBody: newIfBody, elif: newElif, elseBody: newElseBody}
         }
@@ -249,13 +248,13 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
         case "while": {
             const newCond = tcExpr(s.cond, functions, variables);
 
-            functions = enterNewFunctionScope(functions);
-            variables = enterNewVariableScope(variables);
+            // functions = enterNewFunctionScope(functions);
+            // variables = enterNewVariableScope(variables);
 
             const newBody = s.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
 
-            exitCurrentFunctionScope(functions);
-            exitCurrentVariableScope(variables);
+            // exitCurrentFunctionScope(functions);
+            // exitCurrentVariableScope(variables);
             return { ...s, cond: newCond, body: newBody };
         }
 
@@ -269,7 +268,7 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : Bo
         case "return": {
             const valTyp = tcExpr(s.value, functions, variables);
             if(valTyp.a !== currentReturn) {
-                throw new Error(`${valTyp} returned but ${currentReturn} expected.`);
+                throw new Error(`${valTyp.a} returned but ${currentReturn} expected.`);
             }
             return { ...s, value: valTyp };
         }

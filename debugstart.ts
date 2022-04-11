@@ -1,5 +1,4 @@
-import {parser } from "lezer-python";
-import { TreeCursor } from "lezer-tree";
+import { parser } from "lezer-python";
 import { stringifyTree } from "./treeprinter";
 import { parse } from "./parser";
 
@@ -43,19 +42,12 @@ x = x + 1
 `
 
 source = `
-def f1(b: int) -> int:
-    return b * 1
+def f2():
+    return
 `
 
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
-console.log(1)
-
 
 const stmts = parse(source);
-
 console.log(stmts)
-
-type BodyEnv = Map<string, number>;
-var v = new Map<string, number>();
-console.log(v.get("a"));

@@ -11,9 +11,11 @@ export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
     var originName = c.node.type.name;
     var args: Array<Expr<any>> = [];
     c.firstChild();
-    while(c.nextSibling()) {
+    c.nextSibling();
+    while(c.type.name !== ")") {
         args.push(traverseExpr(c, s));
-        c.nextSibling();
+        c.nextSibling(); // Focuses on either "," or ")"
+        c.nextSibling(); // Focuses on a VariableName
     }
     c.parent();
     assert(c.node.type.name == originName);
@@ -225,7 +227,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // Focus on ParamList
             var params = traverseParameters(c, s)
             c.nextSibling(); // Focus on Body or TypeDef
-            var ret : Type;
+            var ret : Type = Type.None;
             var maybeTD = c;
             if(maybeTD.type.name === "TypeDef") {
                 c.firstChild();
@@ -314,6 +316,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 body: whileBody
             }
         }
+        case "⚠":
         case "PassStatement": {
             assert(c.node.type.name == originName);
             return { tag: "pass"}
@@ -321,8 +324,9 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
         case "ReturnStatement": {
             c.firstChild(); // return keyword
             var maybeRet = c.nextSibling();
-            var returnExpr = undefined;
-            if (maybeRet) {
+            var dummyC = c;
+            var returnExpr: Expr<any> = {tag: "literal", value: {tag: "none"}};
+            if (maybeRet && dummyC.node.type.name != "⚠") {
                 returnExpr = traverseExpr(c, s);
             }
             c.parent();

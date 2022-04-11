@@ -131,8 +131,6 @@ export function codeGenStmt(stmt : Stmt<Type>, globals : Env) : Array<string> {
                     `)`];
         }
         case "declare":
-            // TODO:
-            // add (local $) here
         case "assign": {
             var valStmts = codeGenExpr(stmt.value, globals);
             if(globals.has(stmt.name)) { valStmts.push(`global.set $${stmt.name}`); }
