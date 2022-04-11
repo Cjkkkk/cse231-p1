@@ -1,47 +1,47 @@
 
 import { BinOp, Expr, Stmt, Type, UniOp } from "./ast";
 
-type FunctionsEnv = Map<string, [Type[], Type]>;
-type BodyEnv = Map<string, Type>;
+type FunctionsEnv = Map<string, [Type[], Type]>[];
+type VariablesEnv = Map<string, Type>[];
 
 function assert(value: boolean) {
     if(!value) throw new Error("Assertion fail"); 
 }
 
-function getCurrentVariableScope(variables : BodyEnv[]): BodyEnv {
+function getCurrentVariableScope(variables : VariablesEnv): Map<string, Type> {
     assert(variables.length > 0);
     return variables[variables.length - 1];
 }
 
-function getCurrentFunctionScope(functions : FunctionsEnv[]): FunctionsEnv {
+function getCurrentFunctionScope(functions : FunctionsEnv): Map<string, [Type[], Type]> {
     assert(functions.length > 0);
     return functions[functions.length - 1];
 }
 
 
-function enterNewVariableScope(variables : BodyEnv[]): BodyEnv[] {
+function enterNewVariableScope(variables : VariablesEnv): VariablesEnv {
     variables.push(new Map<string, Type>());
     return variables;
 }
 
 
-function exitCurrentVariableScope(variables : BodyEnv[]): BodyEnv[] {
+function exitCurrentVariableScope(variables : VariablesEnv): VariablesEnv {
     variables.pop();
     return variables;
 }
 
 
-function enterNewFunctionScope(functions : FunctionsEnv[]): FunctionsEnv[] {
+function enterNewFunctionScope(functions : FunctionsEnv): FunctionsEnv {
     functions.push(new Map<string, [Type[], Type]>());
     return functions;
 }
 
-function exitCurrentFunctionScope(functions : FunctionsEnv[]): FunctionsEnv[] {
+function exitCurrentFunctionScope(functions : FunctionsEnv): FunctionsEnv {
     functions.pop();
     return functions;
 }
 
-export function tcExpr(e : Expr<any>, functions : FunctionsEnv[], variables : BodyEnv[]) : Expr<Type> {
+export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : VariablesEnv) : Expr<Type> {
     var func = getCurrentFunctionScope(functions);
     var variable = getCurrentVariableScope(variables);
     switch(e.tag) {
@@ -139,7 +139,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv[], variables : Bo
 }
 
 
-function lookUpVar(variables : BodyEnv[], name: string, current: boolean): [boolean, Type] {
+function lookUpVar(variables : VariablesEnv, name: string, current: boolean): [boolean, Type] {
     var end = current? variables.length - 1: 0;
     for(var i = variables.length - 1; i >= end; i --) {
         if(variables[i].has(name)) return [true, variables[i].get(name)];
@@ -149,11 +149,11 @@ function lookUpVar(variables : BodyEnv[], name: string, current: boolean): [bool
 }
 
 
-function defineNewVar(variables : BodyEnv[], name: string, type: Type) {
+function defineNewVar(variables : VariablesEnv, name: string, type: Type) {
     getCurrentVariableScope(variables).set(name, type);
 }
 
-function lookUpFunc(functions: FunctionsEnv[], name: string, current: boolean): [boolean, [Type[], Type]] {
+function lookUpFunc(functions: FunctionsEnv, name: string, current: boolean): [boolean, [Type[], Type]] {
     var end = current? functions.length - 1: 0;
     for(var i = functions.length - 1; i >= end; i --) {
         if(functions[i].has(name)) return [true, functions[i].get(name)];
@@ -163,11 +163,11 @@ function lookUpFunc(functions: FunctionsEnv[], name: string, current: boolean): 
 }
 
 
-function defineNewFunc(functions: FunctionsEnv[], name: string, sig: [Type[], Type]) {
+function defineNewFunc(functions: FunctionsEnv, name: string, sig: [Type[], Type]) {
     getCurrentFunctionScope(functions).set(name, sig);
 }
 
-export function tcStmt(s : Stmt<any>, functions : FunctionsEnv[], variables : BodyEnv[], currentReturn : Type) : Stmt<Type> {
+export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : VariablesEnv, currentReturn : Type) : Stmt<Type> {
     switch(s.tag) {
         case "declare": {
             const rhs = tcExpr(s.value, functions, variables);
@@ -297,9 +297,12 @@ export function checkDefinition(p : Stmt<any>[]) {
 
 
 export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
-    const functions = [new Map<string, [Type[], Type]>()];
-    const variables = [new Map<string, Type>()];
+    var functions: FunctionsEnv = [];
+    var variables: VariablesEnv = [];
 
+    functions = enterNewFunctionScope(functions);
+    variables = enterNewVariableScope(variables);
+    
     checkDefinition(p);
     return p.map(s => {
         const res = tcStmt(s, functions, variables, Type.None);
