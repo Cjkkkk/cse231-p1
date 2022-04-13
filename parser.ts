@@ -1,7 +1,7 @@
-import {parser} from "lezer-python";
-import {TreeCursor} from "lezer-tree";
-import {BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody} from "./ast";
-
+import { parser } from "lezer-python";
+import { TreeCursor } from "lezer-tree";
+import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody } from "./ast";
+import { expect } from 'chai';
 
 function assert(value: boolean) {
     if(!value) throw new Error("Assertion fail"); 
@@ -18,7 +18,7 @@ export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
         c.nextSibling(); // Focuses on a VariableName
     }
     c.parent();
-    assert(c.node.type.name == originName);
+    expect(c.node.type.name).to.equal(originName);
     return args;
 }
 
@@ -43,7 +43,7 @@ export function traverseType(c : TreeCursor, s : string): Type {
             throw new Error("Unknown type: " + c.type.name);
     }
     c.parent();
-    assert(c.node.type.name == originName);
+    expect(c.node.type.name).to.equal(originName);
     return type;
 }
 
@@ -65,7 +65,7 @@ export function traverseParameters(c : TreeCursor, s : string) : Array<TypeDef> 
         c.nextSibling(); // Focuses on a VariableName
     }
     c.parent();       // Pop to ParamList
-    assert(c.node.type.name == originName);
+    expect(c.node.type.name).to.equal(originName);
     return parameters;
 }
 
@@ -93,7 +93,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
             c.nextSibling();
             var rexpr = traverseExpr(c, s);
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return rexpr;
         }
         case "UnaryExpression": {
@@ -112,7 +112,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
             c.nextSibling();
             const expr = traverseExpr(c, s);
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "unary",
                 op: uniOp,
@@ -167,7 +167,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
             c.nextSibling(); // go to right
             const right = traverseExpr(c, s);
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "binary",
                 op: op,
@@ -181,7 +181,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
             c.nextSibling();
             const args = traverseArgs(c, s);
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "call",
                 name: callName,
@@ -225,7 +225,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // go to value
             const value = traverseExpr(c, s);
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "assign",
                 var: {name, type},
@@ -247,7 +247,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // body
             const body = traverseBody(c, s);
             c.parent();      // Pop to FunctionDefinition
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "func", 
                 name: name,
@@ -275,7 +275,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             }
 
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "if",
                 if: ifCondBody,
@@ -288,7 +288,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // while expr
             var whileCondBody = traverseCondBody(c, s);
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return {
                 tag: "while",
                 while: whileCondBody
@@ -296,7 +296,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
         }
         case "⚠":
         case "PassStatement": {
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return { tag: "pass"}
         }
         case "ReturnStatement": {
@@ -308,14 +308,14 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 returnExpr = traverseExpr(c, s);
             }
             c.parent();
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return { tag: "return", value: returnExpr }
         }
         case "ExpressionStatement": {
             c.firstChild();
             const expr = traverseExpr(c, s);
             c.parent(); // pop going into stmt
-            assert(c.node.type.name == originName);
+            expect(c.node.type.name).to.equal(originName);
             return { tag: "expr", expr: expr }
         }
         default:
