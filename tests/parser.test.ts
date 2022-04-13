@@ -20,7 +20,7 @@ describe('traverseExpr(c, s) function', () => {
         const parsedExpr = traverseExpr(cursor, source);
 
         // Note: we have to use deep equality when comparing objects
-        expect(parsedExpr).to.deep.equal({tag: "num", value: 987});
+        expect(parsedExpr).to.deep.equal({tag: "literal", value: {tag: "num", value: 987}});
     })
 
     // TODO: add additional tests here to ensure traverseExpr works as expected
@@ -37,29 +37,6 @@ describe('traverseStmt(c, s) function', () => {
         const parsedStmt = traverseStmt(cursor, source);
 
         // Note: we have to use deep equality when comparing objects
-        expect(parsedStmt).to.deep.equal({ tag: "define", name: "a", value: { tag: "num", value: 1 } });
+        expect(parsedStmt).to.deep.equal({ tag: "assign", var: {name: "a", type: undefined}, value: {tag: "literal", value: { tag: "num", value: 1 } }});
     })
-});
-
-describe('traverse(c, s) function', () => {
-    // TODO: add tests here to ensure traverse works as expected
-    it('parses a assignment in the beginning', () => {
-        const source = "a = 1";
-        const cursor = parser.parse(source).cursor();
-
-        // go to statement
-        const parsedStmts = traverse(cursor, source);
-
-        // Note: we have to use deep equality when comparing objects
-        expect(parsedStmts).to.deep.equal([{ tag: "define", name: "a", value: { tag: "num", value: 1}}]);
-    })
-});
-
-describe('parse(source) function', () => {
-    it('parse a number', () => {
-        const parsed = parse("987");
-        expect(parsed).to.deep.equal([{tag: "expr", expr: {tag: "num", value: 987}}]);
-    });    
-
-    // TODO: add additional tests here to ensure parse works as expected
 });

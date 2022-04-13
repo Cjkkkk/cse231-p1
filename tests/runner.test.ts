@@ -1,6 +1,7 @@
 import { compile, run } from '../compiler';
 import { expect } from 'chai';
 import 'mocha';
+import { assert } from 'console';
 
 function runTest(source: string) {
     return run(compile(source), importObject);
@@ -33,10 +34,8 @@ beforeEach(function () {
     importObject.output = "";
 });
 
-// We write end-to-end tests here to make sure the compiler works as expected.
-// You should write enough end-to-end tests until you are confident the compiler
-// runs as expected. 
-describe('run(source, config) function', () => {
+
+describe('test correctness', () => {
     const config = { importObject };
     it('returns the right number', async () => {
         var result = await runTest("987");
@@ -111,6 +110,7 @@ describe('test operations', () => {
             await runTest(`
                 print(1+True)
             `);
+            assert(false);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -120,8 +120,9 @@ describe('test operations', () => {
                 x:int = 1
                 x = y
             `);
+            assert(false);
         } catch (error) {
-            expect(error.message).to.equal(`Expect type 'int'; got type 'bool'`);
+            expect(error.name).to.equal("TypeError");
         }
     });
 
@@ -331,7 +332,7 @@ describe('test functions', () => {
                 f(y, y)
             `);
         } catch (error) {
-            expect(error.message).to.equal(`Expected 1 arguments; got 2`);
+            expect(error.message).to.equal("Expected 1 arguments but got 2");
         }
 
         try {
@@ -342,7 +343,7 @@ describe('test functions', () => {
                 y = f(1)
             `);
         } catch (error) {
-            expect(error.name).to.equal(`TypeError`);
+            expect(error.name).to.equal("TypeError");
         }
 
     });
@@ -358,8 +359,7 @@ describe('test functions', () => {
                 print(x)
             `);
         } catch (error) {
-            expect(error.message).to.equal("Cannot assign variable " +
-                "that is not explicitly declared in this scope: x");
+            expect(error.message).to.equal("Reference error: x is not defined");
         }
 
         try {
@@ -380,7 +380,7 @@ describe('test functions', () => {
                 f(y, y)
             `);
         } catch (error) {
-            expect(error.message).to.equal(`Expected 1 arguments; got 2`);
+            expect(error.message).to.equal("Expected 1 arguments but got 2");
         }
 
         try {
@@ -391,7 +391,7 @@ describe('test functions', () => {
                 y = f(1)
             `);
         } catch (error) {
-            expect(error.name).to.equal(`TypeError`);
+            expect(error.name).to.equal("TypeError");
         }
 
     });
@@ -404,7 +404,7 @@ describe('test functions', () => {
                 x:int = 2
             `);
         } catch (error) {
-            expect(error.message).to.equal("Duplicate declaration of identifier in the same scope: x");
+            expect(error.message).to.equal("Redefine variable: x");
         }
 
         try {
@@ -416,7 +416,7 @@ describe('test functions', () => {
                 x = f(x)
             `);
         } catch (error) {
-            expect(error.message).to.equal("Duplicate declaration of identifier in the same scope: x");
+            expect(error.message).to.equal("Redefine variable: x");
         }
     });
 

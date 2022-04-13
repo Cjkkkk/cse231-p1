@@ -66,13 +66,13 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
                 case BinOp.Div: 
                 case BinOp.Mod:
                     if (lhs.a != Type.Int || rhs.a != Type.Int) {
-                        throw new Error(`Expected type Int but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: Type.Int, lhs, rhs};
                 case BinOp.Equal:
                 case BinOp.Unequal:
                     if (lhs.a != rhs.a) {
-                        throw new Error(`Expected type equality of lhs and rhs but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`Expected lhs and rhs to be same type but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: Type.Bool, lhs, rhs};
                 case BinOp.Gt: 
@@ -80,7 +80,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
                 case BinOp.Lt:
                 case BinOp.Le:
                     if (lhs.a != Type.Int || rhs.a != Type.Int) {
-                        throw new Error(`Expected type Int but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: Type.Bool, lhs, rhs };
                 case BinOp.Is: 
@@ -94,12 +94,12 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
             switch(e.op) {
                 case UniOp.Not: 
                     if (expr.a != Type.Bool) {
-                        throw new Error(`Expected type Bool but got type ${expr.a}`)
+                        throw new TypeError(`Expected type BOOL but got type ${expr.a}`)
                     }
                     return { ...e, a: Type.Bool, expr: expr };
                 case UniOp.Neg: 
                     if (expr.a != Type.Int) {
-                        throw new Error(`Expected type Int but got type ${expr.a}`)
+                        throw new TypeError(`Expected type INT but got type ${expr.a}`)
                     }
                     return { ...e, a: Type.Int, expr: expr };
             }
@@ -107,7 +107,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
         case "name": {
             let [found, t] = lookUpVar(variables, e.name, false);
             if (!found) {
-                throw new Error(`Reference error: ${e.name} is not defined`)
+                throw new ReferenceError(`Reference error: ${e.name} is not defined`)
             }
             return { ...e, a: t};
         }
@@ -120,7 +120,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
             }
             let [found, t] = lookUpFunc(functions, e.name, false);
             if(!found) {
-                throw new Error(`function ${e.name} not found`);
+                throw new ReferenceError(`function ${e.name} is not defined`);
             }
 
             const [args, ret] = t;
@@ -130,7 +130,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
 
             const newArgs = args.map((a, i) => {
                 const argtyp = tcExpr(e.args[i], functions, variables);
-                if(a !== argtyp.a) { throw new Error(`Got ${argtyp} as argument ${i + 1}, expected ${a}`); }
+                if(a !== argtyp.a) { throw new TypeError(`Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
                 return argtyp
             });
 
@@ -180,15 +180,15 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
                     throw new Error(`can only initialize variable with literal`);
                 }
                 if ( rhs.a != s.var.type) {
-                    throw new Error(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
+                    throw new TypeError(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
                 }
                 defineNewVar(variables, s.var.name, rhs.a);
             } else {
                 if (!found) {
-                    throw new Error(`Reference error: ${s.var.name} is not defined`);
+                    throw new ReferenceError(`Reference error: ${s.var.name} is not defined`);
                 }
                 if( t !== rhs.a) {
-                    throw new Error(`Cannot assign ${rhs} to ${t}`);
+                    throw new TypeError(`Cannot assign ${rhs.a} to ${t}`);
                 }
             }
             return { ...s, value: rhs };
@@ -269,7 +269,7 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
         case "return": {
             const valTyp = tcExpr(s.value, functions, variables);
             if(valTyp.a !== currentReturn) {
-                throw new Error(`${valTyp.a} returned but ${currentReturn} expected.`);
+                throw new TypeError(`${valTyp.a} returned but ${currentReturn} expected.`);
             }
             return { ...s, value: valTyp };
         }

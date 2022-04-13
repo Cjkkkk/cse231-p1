@@ -134,7 +134,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                 case "*":
                     op = BinOp.Mul;
                     break;
-                case "/":
+                case "//":
                     op = BinOp.Div;
                     break;
                 case "%":
@@ -162,7 +162,7 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                     op = BinOp.Is;
                     break;
                 default:
-                    throw new Error("PARSE ERROR: unknown binary operator")
+                    throw new Error("PARSE ERROR: unknown binary operator: " + s.substring(c.from, c.to))
             };
             c.nextSibling(); // go to right
             const right = traverseExpr(c, s);
