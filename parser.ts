@@ -3,9 +3,6 @@ import { TreeCursor } from "lezer-tree";
 import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody } from "./ast";
 import { expect } from 'chai';
 
-function assert(value: boolean) {
-    if(!value) throw new Error("Assertion fail"); 
-}
 
 export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
     var originName = c.node.type.name;
