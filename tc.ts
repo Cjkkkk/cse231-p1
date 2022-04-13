@@ -1,12 +1,10 @@
 
+import { assert } from "chai";
 import { BinOp, Expr, Stmt, Type, UniOp, TypeDef } from "./ast";
-
 type FunctionsEnv = Map<string, [Type[], Type]>[];
 type VariablesEnv = Map<string, Type>[];
 
-function assert(value: boolean) {
-    if(!value) throw new Error("Assertion fail"); 
-}
+
 
 function getCurrentVariableScope(variables : VariablesEnv): Map<string, Type> {
     assert(variables.length > 0);
@@ -42,20 +40,18 @@ function exitCurrentFunctionScope(functions : FunctionsEnv): FunctionsEnv {
 }
 
 export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : VariablesEnv) : Expr<Type> {
-    var func = getCurrentFunctionScope(functions);
-    var variable = getCurrentVariableScope(variables);
     switch(e.tag) {
         case "literal":
-        if( e.value.tag == "num") {
-            return { ...e, a: Type.Int };
-        } else if (e.value.tag == "true") {
-            return { ...e, a: Type.Bool }; 
-        } else if (e.value.tag == "false") {
-            return { ...e, a: Type.Bool };
-        } else {
-            // TODO: fix none
-            return { ...e, a: Type.None };
-        }
+            if( e.value.tag == "num") {
+                return { ...e, a: Type.Int };
+            } else if (e.value.tag == "true") {
+                return { ...e, a: Type.Bool }; 
+            } else if (e.value.tag == "false") {
+                return { ...e, a: Type.Bool };
+            } else {
+                // TODO: fix none
+                return { ...e, a: Type.None };
+            }
         case "binary": {
             const lhs = tcExpr(e.lhs, functions, variables);
             const rhs = tcExpr(e.rhs, functions, variables);
@@ -213,7 +209,9 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
 
         case "if": {
             const newIfCond = tcExpr(s.if.cond, functions, variables);
-            
+            if(newIfCond.a != Type.Bool) {
+                throw new TypeError("Expect type BOOL in condition")
+            }
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
             const newIfBody = s.if.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
@@ -223,7 +221,9 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
 
             const newElif = s.elif.map(bs => {
                 let cond = tcExpr(bs.cond, functions, variables);
-                
+                if(cond.a != Type.Bool) {
+                    throw new TypeError("Expect type BOOL in condition")
+                }
                 // functions = enterNewFunctionScope(functions);
                 // variables = enterNewVariableScope(variables);
 
@@ -249,7 +249,9 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
 
         case "while": {
             const newCond = tcExpr(s.while.cond, functions, variables);
-
+            if(newCond.a != Type.Bool) {
+                throw new TypeError("Expect type BOOL in condition")
+            }
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
 

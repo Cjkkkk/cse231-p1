@@ -3,26 +3,25 @@ import {compile, run} from './compiler';
 
 document.addEventListener("DOMContentLoaded", async () => {
     function display(arg : string) {
-        const elt = document.createElement("pre");
-        document.getElementById("output").appendChild(elt);
-        elt.innerText = arg;
+        const output = document.getElementById("output");
+        output.textContent += arg + "\n";
     }
     var importObject = {
         imports: {
-            print_num: (arg : any) => {
-                console.log("Logging from WASM: ", arg);
-                display(String(arg));
-                return arg;
-            },
-            print_bool: (arg : any) => {
-                if(arg === 0) { display("False"); }
-                else { display("True"); }
-                return arg;
-            },
-            print_none: (arg: any) => {
-                display("None");
-                return arg;
-            }
+        print_num: (arg : any) => {
+            console.log("Logging from WASM: ", arg);
+            display(String(arg));
+            return arg;
+        },
+        print_bool: (arg : any) => {
+            if(arg === 0) { display("False"); }
+            else { display("True"); }
+            return arg;
+        },
+        print_none: (arg: any) => {
+            display("None");
+            return arg;
+        }
         },
     };
     const runButton = document.getElementById("run");
