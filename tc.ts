@@ -171,8 +171,8 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
     switch(s.tag) {    
         case "assign": {
             const rhs = tcExpr(s.value, functions, variables);
-            const [found, t] = lookUpVar(variables, s.var.name, true);
             if (s.var.type != undefined) {
+                const [found, t] = lookUpVar(variables, s.var.name, true);
                 if (found) {
                     throw new Error(`Redefine variable: ${s.var.name}`)
                 }
@@ -184,6 +184,7 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
                 }
                 defineNewVar(variables, s.var.name, rhs.a);
             } else {
+                const [found, t] = lookUpVar(variables, s.var.name, true);
                 if (!found) {
                     throw new ReferenceError(`Reference error: ${s.var.name} is not defined`);
                 }

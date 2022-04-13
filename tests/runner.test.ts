@@ -1,7 +1,6 @@
 import { compile, run } from '../compiler';
 import { expect } from 'chai';
 import 'mocha';
-import { assert } from 'console';
 
 function runTest(source: string) {
     return run(compile(source), importObject);
@@ -110,7 +109,7 @@ describe('test operations', () => {
             await runTest(`
                 print(1+True)
             `);
-            assert(false);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -120,7 +119,7 @@ describe('test operations', () => {
                 x:int = 1
                 x = y
             `);
-            assert(false);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -311,6 +310,7 @@ describe('test functions', () => {
                     y:bool = False
                     return y
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -321,6 +321,7 @@ describe('test functions', () => {
                     return x
                 f(y)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -331,6 +332,7 @@ describe('test functions', () => {
                     return x
                 f(y, y)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.message).to.equal("Expected 1 arguments but got 2");
         }
@@ -342,6 +344,7 @@ describe('test functions', () => {
                     return x == 1
                 y = f(1)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -358,6 +361,7 @@ describe('test functions', () => {
                 fun()
                 print(x)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.message).to.equal("Reference error: x is not defined");
         }
@@ -369,6 +373,7 @@ describe('test functions', () => {
                     return x
                 f(y)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -379,6 +384,7 @@ describe('test functions', () => {
                     return x
                 f(y, y)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.message).to.equal("Expected 1 arguments but got 2");
         }
@@ -390,6 +396,7 @@ describe('test functions', () => {
                     return x == 1
                 y = f(1)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.name).to.equal("TypeError");
         }
@@ -403,6 +410,7 @@ describe('test functions', () => {
                 x:int = 1
                 x:int = 2
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.message).to.equal("Redefine variable: x");
         }
@@ -415,6 +423,7 @@ describe('test functions', () => {
                     return x
                 x = f(x)
             `);
+            expect(false).to.equal(true);
         } catch (error) {
             expect(error.message).to.equal("Redefine variable: x");
         }

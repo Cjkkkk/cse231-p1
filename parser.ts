@@ -331,7 +331,7 @@ export function traverse(c : TreeCursor, s : string) : Array<Stmt<any>> {
             do {
                 stmts.push(traverseStmt(c, s));
             } while(c.nextSibling())
-            console.log("traversed " + stmts.length + " statements ", stmts, "stopped at " , c.node);
+            // console.log("traversed " + stmts.length + " statements ", stmts, "stopped at " , c.node);
             return stmts;
         }
         default:
