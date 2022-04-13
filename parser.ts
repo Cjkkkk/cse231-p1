@@ -1,6 +1,6 @@
 import {parser} from "lezer-python";
 import {TreeCursor} from "lezer-tree";
-import {BinOp, Expr, Stmt, UniOp, Type, Parameter} from "./ast";
+import {BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody} from "./ast";
 
 
 function assert(value: boolean) {
@@ -22,23 +22,32 @@ export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
     return args;
 }
 
-export function traverseType(c : TreeCursor, s : string) : Type {
+export function traverseType(c : TreeCursor, s : string): Type {
+    var originName = c.node.type.name;
+    var type: Type = undefined;
+    c.firstChild();  // Enter TypeDef
+    c.nextSibling(); // Focuses on type itself
     switch(c.type.name) {
         case "VariableName": {
             const name = s.substring(c.from, c.to);
             if(name == "int") {
-                return Type.Int;
+                type = Type.Int;
             } else if(name == "bool") {
-                return Type.Bool
+                type = Type.Bool;
+            } else {
+                throw new Error("Unknown type: " + name);
             }
-            throw new Error("Unknown type: " + name)
+            break;
         }
         default:
-            throw new Error("Unknown type: " + c.type.name)
+            throw new Error("Unknown type: " + c.type.name);
     }
+    c.parent();
+    assert(c.node.type.name == originName);
+    return type;
 }
 
-export function traverseParameters(c : TreeCursor, s : string) : Array<Parameter> {
+export function traverseParameters(c : TreeCursor, s : string) : Array<TypeDef> {
     var originName = c.node.type.name;
     c.firstChild();  // Focuses on open paren
     const parameters = []
@@ -47,11 +56,10 @@ export function traverseParameters(c : TreeCursor, s : string) : Array<Parameter
         var name = s.substring(c.from, c.to);
         c.nextSibling(); // Focuses on "TypeDef", hopefully, or "," if mistake
         var nextTagName = c.type.name; // NOTE(joe): a bit of a hack so the next line doesn't if-split
-        if(nextTagName !== "TypeDef") { throw new Error("Missed type annotation for parameter " + name)};
-        c.firstChild();  // Enter TypeDef
-        c.nextSibling(); // Focuses on type itself
+        if(nextTagName !== "TypeDef") { 
+            throw new Error("Missed type annotation for parameter " + name)
+        };
         var type = traverseType(c, s);
-        c.parent();
         c.nextSibling(); // Move on to comma or ")"
         parameters.push({name, type});
         c.nextSibling(); // Focuses on a VariableName
@@ -185,38 +193,42 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
     }
 }
 
+export function traverseCondBody(c : TreeCursor, s : string): CondBody<any> {
+    var cond = traverseExpr(c, s);
+    c.nextSibling(); // if body
+    var body = traverseBody(c, s);
+    return {cond, body};
+}
+
+export function traverseBody(c: TreeCursor, s: string): Stmt<any>[] {
+    var body = [];
+    c.firstChild(); // :
+    while(c.nextSibling()) {
+        body.push(traverseStmt(c, s));
+    }
+    c.parent();
+    return body;
+}
+
 export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
     var originName = c.node.type.name;
     switch(c.node.type.name) {      
         case "AssignStatement": {
             c.firstChild(); // go to name
-            const vname = s.substring(c.from, c.to);
+            const name = s.substring(c.from, c.to);
             c.nextSibling(); // go to equals or typedef
-            var ret : Type;
-            var isDeclare = false;
+            var type : Type = undefined;
             if (c.type.name === "TypeDef") {
-                c.firstChild();
-                c.nextSibling()
-                ret = traverseType(c, s);
-                isDeclare = true;
-                c.parent();
+                type = traverseType(c, s);
                 c.nextSibling(); // go to equals
             }
             c.nextSibling(); // go to value
             const value = traverseExpr(c, s);
             c.parent();
             assert(c.node.type.name == originName);
-            if(isDeclare) {
-                return {
-                    tag: "declare",
-                    name: vname,
-                    type: ret,
-                    value: value
-                }
-            }
             return {
                 tag: "assign",
-                name: vname,
+                var: {name, type},
                 value: value
             }
         }
@@ -230,21 +242,14 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             var ret : Type = Type.None;
             var maybeTD = c;
             if(maybeTD.type.name === "TypeDef") {
-                c.firstChild();
                 ret = traverseType(c, s);
-                c.parent();
             }
             c.nextSibling(); // body
-            c.firstChild(); // :
-            const body = [];
-            while(c.nextSibling()) {
-                body.push(traverseStmt(c, s));
-            }
-            c.parent();      // Pop to Body
+            const body = traverseBody(c, s);
             c.parent();      // Pop to FunctionDefinition
             assert(c.node.type.name == originName);
             return {
-                tag: "define", 
+                tag: "func", 
                 name: name,
                 params: params,
                 body: body, 
@@ -254,66 +259,39 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
         case "IfStatement": {
             c.firstChild(); // if
             c.nextSibling(); // if expr
-            var ifCond = traverseExpr(c, s);
-            var ifBody = [];
-            c.nextSibling(); // if body
-            c.firstChild(); // :
-            while(c.nextSibling()) {
-                ifBody.push(traverseStmt(c, s));
-            }
-            c.parent();
-            var elif = [];
+            var ifCondBody = traverseCondBody(c, s);
+            var elifCondBody = [];
             while(c.nextSibling() && s.substring(c.from, c.to) == "elif") {
                 // elif
-                c.nextSibling(); // cond
-                var elifCond = traverseExpr(c, s);
-                var elifBody = [];
-                c.nextSibling(); // elif body
-                c.firstChild(); // :
-                while(c.nextSibling()) {
-                    elifBody.push(traverseStmt(c, s));
-                }
-                c.parent();
-                elif.push({cond: elifCond, body: elifBody})
+                c.nextSibling(); // if expr
+                var elifStmt = traverseCondBody(c, s);
+                elifCondBody.push(elifStmt);
             }
             // parse else
-            var elseBody = [];
+            var elseBody: Stmt<any>[] = [];
             if (s.substring(c.from, c.to) == "else") {
                 c.nextSibling(); // elif body
-                c.firstChild(); // :
-                while(c.nextSibling()) {
-                    elseBody.push(traverseStmt(c, s));
-                }
-                c.parent();
+                elseBody = traverseBody(c, s);
             }
 
             c.parent();
             assert(c.node.type.name == originName);
             return {
                 tag: "if",
-                ifCond: ifCond,
-                ifBody: ifBody,
-                elif: elif,
-                elseBody: elseBody
+                if: ifCondBody,
+                elif: elifCondBody,
+                else: elseBody
             }
         }
         case "WhileStatement": {
-            var whileBody = [];
             c.firstChild(); // while keyword
             c.nextSibling(); // while expr
-            var whileCond = traverseExpr(c, s);
-            c.nextSibling(); // while body
-            c.firstChild(); // :
-            while(c.nextSibling()) {
-                whileBody.push(traverseStmt(c, s));
-            }
-            c.parent();
+            var whileCondBody = traverseCondBody(c, s);
             c.parent();
             assert(c.node.type.name == originName);
             return {
                 tag: "while",
-                cond: whileCond,
-                body: whileBody
+                while: whileCondBody
             }
         }
         case "⚠":

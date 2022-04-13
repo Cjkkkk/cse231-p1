@@ -42,8 +42,9 @@ x = x + 1
 `
 
 source = `
-def f2():
-    return
+def f1() -> int:
+    test: int = 1
+    return test
 `
 
 const t = parser.parse(source);

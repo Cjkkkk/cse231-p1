@@ -1,9 +1,8 @@
-def f1():
+def f1() -> int:
     test: int = 1
-    return
+    return test
 
 x: int = 5
 y: int = 6
-
 x = x + 1
 print(x)

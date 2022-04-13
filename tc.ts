@@ -1,5 +1,5 @@
 
-import { BinOp, Expr, Stmt, Type, UniOp } from "./ast";
+import { BinOp, Expr, Stmt, Type, UniOp, TypeDef } from "./ast";
 
 type FunctionsEnv = Map<string, [Type[], Type]>[];
 type VariablesEnv = Map<string, Type>[];
@@ -168,36 +168,33 @@ function defineNewFunc(functions: FunctionsEnv, name: string, sig: [Type[], Type
 }
 
 export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : VariablesEnv, currentReturn : Type) : Stmt<Type> {
-    switch(s.tag) {
-        case "declare": {
-            const rhs = tcExpr(s.value, functions, variables);
-            if ( rhs.a != s.type) {
-                throw new Error(`Incompatible type when declaring variable ${s.name} of type ${s.type} using type ${rhs.a}`)
-            }
-            let [found, t] = lookUpVar(variables, s.name, true);
-            if (found) {
-                throw new Error(`Redefine variable: ${s.name}`)
-            }
-            defineNewVar(variables, s.name, rhs.a);
-            return { ...s, value: rhs };
-        }
-
-        
+    switch(s.tag) {    
         case "assign": {
             const rhs = tcExpr(s.value, functions, variables);
-            let [found, t] = lookUpVar(variables, s.name, false);
-            if (!found) {
-                throw new Error(`Reference error: ${s.name} is not defined`);
+            const [found, t] = lookUpVar(variables, s.var.name, true);
+            if (s.var.type != undefined) {
+                if (found) {
+                    throw new Error(`Redefine variable: ${s.var.name}`)
+                }
+                if ( rhs.tag != "literal") {
+                    throw new Error(`can only initialize variable with literal`);
+                }
+                if ( rhs.a != s.var.type) {
+                    throw new Error(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
+                }
+                defineNewVar(variables, s.var.name, rhs.a);
+            } else {
+                if (!found) {
+                    throw new Error(`Reference error: ${s.var.name} is not defined`);
+                }
+                if( t !== rhs.a) {
+                    throw new Error(`Cannot assign ${rhs} to ${t}`);
+                }
             }
-            if(found && t !== rhs.a) {
-                throw new Error(`Cannot assign ${rhs} to ${t}`);
-            }
-            
-            // variable.set(s.name, rhs.a);
             return { ...s, value: rhs };
         }
 
-        case "define": {
+        case "func": {
             defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
 
             functions = enterNewFunctionScope(functions);
@@ -214,11 +211,11 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
         }
 
         case "if": {
-            const newIfCond = tcExpr(s.ifCond, functions, variables);
+            const newIfCond = tcExpr(s.if.cond, functions, variables);
             
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
-            const newIfBody = s.ifBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
+            const newIfBody = s.if.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
 
             // exitCurrentFunctionScope(functions);
             // exitCurrentVariableScope(variables);
@@ -241,25 +238,25 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
             
-            const newElseBody = s.elseBody.map(bs => tcStmt(bs, functions, variables, currentReturn));
+            const newElseBody = s.else.map(bs => tcStmt(bs, functions, variables, currentReturn));
 
             // exitCurrentFunctionScope(functions);
             // exitCurrentVariableScope(variables);
 
-            return {...s, ifCond: newIfCond, ifBody: newIfBody, elif: newElif, elseBody: newElseBody}
+            return {...s, if: {cond: newIfCond, body: newIfBody}, elif: newElif, else: newElseBody}
         }
 
         case "while": {
-            const newCond = tcExpr(s.cond, functions, variables);
+            const newCond = tcExpr(s.while.cond, functions, variables);
 
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
 
-            const newBody = s.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
+            const newBody = s.while.body.map(bs => tcStmt(bs, functions, variables, currentReturn));
 
             // exitCurrentFunctionScope(functions);
             // exitCurrentVariableScope(variables);
-            return { ...s, cond: newCond, body: newBody };
+            return { ...s, while: {cond: newCond, body: newBody}};
         }
 
         case "pass": {
@@ -283,7 +280,7 @@ export function checkDefinition(p : Stmt<any>[]) {
     var LastDeclare = -1;
     var firstStmt = p.length;
     for(var i = 0; i < p.length; i ++) {
-        if (p[i].tag == "declare" || p[i].tag == "define") {
+        if ((p[i].tag === "assign" && (p[i] as {var: TypeDef}).var.type != undefined) || p[i].tag == "func") {
             LastDeclare = i;
         } else {
             firstStmt = i;

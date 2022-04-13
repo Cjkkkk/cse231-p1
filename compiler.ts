@@ -9,17 +9,17 @@ var loop_label = 0;
 function variableNames(stmts: Stmt<Type>[]) : string[] {
     const vars : Array<string> = [];
     stmts.forEach((stmt) => {
-        if(stmt.tag === "declare") { vars.push(stmt.name); }
+        if(stmt.tag === "assign" && stmt.var.type != undefined) { vars.push(stmt.var.name); }
     });
     return vars;
 }
 
 function funs(stmts: Stmt<Type>[]) : Stmt<Type>[] {
-    return stmts.filter(stmt => stmt.tag === "define");
+    return stmts.filter(stmt => stmt.tag === "func");
 }
 
 function nonFuns(stmts: Stmt<Type>[]) : Stmt<Type>[] {
-    return stmts.filter(stmt => stmt.tag !== "define");
+    return stmts.filter(stmt => stmt.tag !== "func");
 }
 
 
@@ -115,7 +115,7 @@ export function codeGenExpr(expr : Expr<Type>, globals : Env) : Array<string> {
 }
 export function codeGenStmt(stmt : Stmt<Type>, globals : Env) : Array<string> {
     switch(stmt.tag) {
-        case "define": {
+        case "func": {
             // Construct the environment for the function body
             const locals = variableNames(stmt.body);
             // Construct the code for params and variable declarations in the body
@@ -130,21 +130,20 @@ export function codeGenStmt(stmt : Stmt<Type>, globals : Env) : Array<string> {
                     `i32.const 0`,
                     `)`];
         }
-        case "declare":
         case "assign": {
             var valStmts = codeGenExpr(stmt.value, globals);
-            if(globals.has(stmt.name)) { valStmts.push(`global.set $${stmt.name}`); }
-            else { valStmts.push(`local.set $${stmt.name}`); }
+            if(globals.has(stmt.var.name)) { valStmts.push(`global.set $${stmt.var.name}`); }
+            else { valStmts.push(`local.set $${stmt.var.name}`); }
             return valStmts;
         }
         case "if": {
             var result = [];
-            var ifCond = codeGenExpr(stmt.ifCond, globals);
+            var ifCond = codeGenExpr(stmt.if.cond, globals);
 
-            var locals = variableNames(stmt.ifBody);
+            var locals = variableNames(stmt.if.body);
             var varDecls = locals.map(v => `(local $${v} i32)`);
 
-            var ifBody = stmt.ifBody.map((v) => codeGenStmt(v, globals)).flat();
+            var ifBody = stmt.if.body.map((v) => codeGenStmt(v, globals)).flat();
             var enclosingCount = 0;
             result.push(...ifCond, `(if`, `(then`, ...varDecls, ...ifBody, `)`);
             enclosingCount += 1;
@@ -159,10 +158,10 @@ export function codeGenStmt(stmt : Stmt<Type>, globals : Env) : Array<string> {
                 enclosingCount += 2;
             }
             
-            var locals = variableNames(stmt.elseBody);
+            var locals = variableNames(stmt.else);
             var varDecls = locals.map(v => `(local $${v} i32)`);
 
-            var elseBody = stmt.elseBody.map((v) => codeGenStmt(v, globals)).flat();
+            var elseBody = stmt.else.map((v) => codeGenStmt(v, globals)).flat();
             result.push(`(else`, ...varDecls, ...elseBody, `)`, ...Array(enclosingCount).fill(")"));
             return result;
         }
@@ -171,12 +170,12 @@ export function codeGenStmt(stmt : Stmt<Type>, globals : Env) : Array<string> {
             loop_label += 1;
             var bodyLabel = loop_label;
             loop_label += 1;
-            var condExpr = codeGenExpr(stmt.cond, globals);
+            var condExpr = codeGenExpr(stmt.while.cond, globals);
 
-            var locals = variableNames(stmt.body);
+            var locals = variableNames(stmt.while.body);
             var varDecls = locals.map(v => `(local $${v} i32)`);
 
-            var bodyStmts = stmt.body.map(s => codeGenStmt(s, globals)).flat();
+            var bodyStmts = stmt.while.body.map(s => codeGenStmt(s, globals)).flat();
             return [`(block $label_${bodyLabel}`,
                     `(loop $label_${condLabel}`,
                     ...condExpr,
