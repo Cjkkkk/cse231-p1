@@ -117,17 +117,10 @@ export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
 
 
 
-export function didAllPathReturn(stmts: Stmt<any>[]): boolean {
-    return stmts.some( s => (s.tag == "return") || (s.tag == "if") && didAllPathReturn(s.if.body) && didAllPathReturn(s.else) && (s.elif.every((e => didAllPathReturn(e.body)))));
-}
-
 
 export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
     switch(stmt.tag) {
         case "func": {
-            if (stmt.ret !== Type.None && !didAllPathReturn(stmt.body)) {
-                throw new Error(`All path in function ${stmt.name} must have a return statement`);
-            }
             const newLocals = new Set(locals);
             // Construct the environment for the function body
             const variables = variableNames(stmt.body);

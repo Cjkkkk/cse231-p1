@@ -32,7 +32,7 @@ f(4)
 // 7
 def is_odd(x: int) -> bool:
     if x == 0:
-        rreturn False
+        return False
     else:
         return is_even(x - 1)
 
@@ -44,4 +44,4 @@ def is_even(x: int) -> bool:
         return is_odd(x - 1)
 
 print(is_odd(10))
-print(id_even(10))
+print(is_even(10))

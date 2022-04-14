@@ -39,6 +39,45 @@ function exitCurrentFunctionScope(functions : FunctionsEnv): FunctionsEnv {
     return functions;
 }
 
+
+function lookUpVar(variables : VariablesEnv, name: string, current: boolean): [boolean, Type] {
+    var end = current? variables.length - 1: 0;
+    for(var i = variables.length - 1; i >= end; i --) {
+        if(variables[i].has(name)) return [true, variables[i].get(name)];
+    }
+    // throw new Error(`Reference error: variable ${name} is not defined`)
+    return [false, Type.None];
+}
+
+
+function defineNewVar(variables : VariablesEnv, name: string, type: Type) {
+    let [found, t] = lookUpVar(variables, name, true);
+    if (found) {
+        throw new Error("Redefine variable: " + name);
+    } else {
+        getCurrentVariableScope(variables).set(name, type);
+    }
+}
+
+function lookUpFunc(functions: FunctionsEnv, name: string, current: boolean): [boolean, [Type[], Type]] {
+    var end = current? functions.length - 1: 0;
+    for(var i = functions.length - 1; i >= end; i --) {
+        if(functions[i].has(name)) return [true, functions[i].get(name)];
+    }
+    return [false, [[], Type.None]];
+}
+
+
+function defineNewFunc(functions: FunctionsEnv, name: string, sig: [Type[], Type]) {
+    let [found, t] = lookUpFunc(functions, name, true);
+    if (found) {
+        throw new Error("Redefine function: " + name);
+    } else {
+        getCurrentFunctionScope(functions).set(name, sig);
+    }
+}
+
+
 export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : VariablesEnv) : Expr<Type> {
     switch(e.tag) {
         case "literal":
@@ -135,50 +174,22 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
 }
 
 
-function lookUpVar(variables : VariablesEnv, name: string, current: boolean): [boolean, Type] {
-    var end = current? variables.length - 1: 0;
-    for(var i = variables.length - 1; i >= end; i --) {
-        if(variables[i].has(name)) return [true, variables[i].get(name)];
-    }
-    // throw new Error(`Reference error: variable ${name} is not defined`)
-    return [false, Type.None];
+export function didAllPathReturn(stmts: Stmt<any>[]): boolean {
+    return stmts.some( s => (s.tag == "return") || (s.tag == "if") && didAllPathReturn(s.if.body) && didAllPathReturn(s.else) && (s.elif.every((e => didAllPathReturn(e.body)))));
 }
 
-
-function defineNewVar(variables : VariablesEnv, name: string, type: Type) {
-    getCurrentVariableScope(variables).set(name, type);
-}
-
-function lookUpFunc(functions: FunctionsEnv, name: string, current: boolean): [boolean, [Type[], Type]] {
-    var end = current? functions.length - 1: 0;
-    for(var i = functions.length - 1; i >= end; i --) {
-        if(functions[i].has(name)) return [true, functions[i].get(name)];
-    }
-    // throw new Error(`Reference error: function ${name} is not defined`)
-    return [false, [[], Type.None]];
-}
-
-
-function defineNewFunc(functions: FunctionsEnv, name: string, sig: [Type[], Type]) {
-    getCurrentFunctionScope(functions).set(name, sig);
-}
 
 export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : VariablesEnv, currentReturn : Type) : Stmt<Type> {
     switch(s.tag) {    
         case "assign": {
             const rhs = tcExpr(s.value, functions, variables);
             if (s.var.type != undefined) {
-                const [found, t] = lookUpVar(variables, s.var.name, true);
-                if (found) {
-                    throw new Error(`Redefine variable: ${s.var.name}`)
-                }
                 if ( rhs.tag != "literal") {
                     throw new Error(`can only initialize variable with literal`);
                 }
                 if ( rhs.a != s.var.type) {
                     throw new TypeError(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
                 }
-                defineNewVar(variables, s.var.name, rhs.a);
             } else {
                 const [found, t] = lookUpVar(variables, s.var.name, true);
                 if (!found) {
@@ -192,12 +203,20 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
         }
 
         case "func": {
-            defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
-
+            if (s.ret !== Type.None && !didAllPathReturn(s.body)) {
+                throw new Error(`All path in function ${s.name} must have a return statement`);
+            }
             functions = enterNewFunctionScope(functions);
             variables = enterNewVariableScope(variables);
 
-            s.params.forEach(p => { defineNewVar(variables, p.name, p.type)});
+            // define param
+            s.params.forEach(p => defineNewVar(variables, p.name, p.type));
+
+            // define local variables and functions
+            s.body.forEach(s => {
+                if (s.tag == "func") defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
+                else if (s.tag == "assign" && s.var.type != undefined) defineNewVar(variables, s.var.name, s.var.type);
+            })
 
             checkDefinition(s.body);
             const newBody = s.body.map(bs => tcStmt(bs, functions, variables, s.ret));
@@ -303,7 +322,14 @@ export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
     functions = enterNewFunctionScope(functions);
     variables = enterNewVariableScope(variables);
     
+    // check if all definition are proceeding statements
     checkDefinition(p);
+    // define all the functions and variables
+    p.forEach(s => {
+        if (s.tag == "func") defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
+        else if (s.tag == "assign" && s.var.type != undefined) defineNewVar(variables, s.var.name, s.var.type);
+    })
+
     return p.map(s => {
         const res = tcStmt(s, functions, variables, Type.None);
         return res;
