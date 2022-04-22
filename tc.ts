@@ -1,9 +1,10 @@
 
 import { assert } from "chai";
-import { BinOp, Expr, Stmt, Type, UniOp, TypeDef } from "./ast";
-type FunctionsEnv = Map<string, [Type[], Type]>[];
+import { BinOp, Expr, Stmt, Type, UniOp, TypeDef, Primitive, Const, FuncStmt, VarStmt } from "./ast";
+type FuncType = [Type[], Type];
+type FunctionsEnv = Map<string, FuncType>[];
 type VariablesEnv = Map<string, Type>[];
-
+type ClassesEnv = Map<string, Map<string, FuncType | Type>>;
 
 
 function getCurrentVariableScope(variables : VariablesEnv): Map<string, Type> {
@@ -46,7 +47,7 @@ function lookUpVar(variables : VariablesEnv, name: string, current: boolean): [b
         if(variables[i].has(name)) return [true, variables[i].get(name)];
     }
     // throw new Error(`Reference error: variable ${name} is not defined`)
-    return [false, Type.None];
+    return [false, Primitive.None];
 }
 
 
@@ -64,7 +65,7 @@ function lookUpFunc(functions: FunctionsEnv, name: string, current: boolean): [b
     for(var i = functions.length - 1; i >= end; i --) {
         if(functions[i].has(name)) return [true, functions[i].get(name)];
     }
-    return [false, [[], Type.None]];
+    return [false, [[], Primitive.None]];
 }
 
 
@@ -78,18 +79,22 @@ function defineNewFunc(functions: FunctionsEnv, name: string, sig: [Type[], Type
 }
 
 
+export function didAllPathReturn(stmts: Stmt<any>[]): boolean {
+    return stmts.some( s => (s.tag == "return") || (s.tag == "if") && didAllPathReturn(s.if.body) && didAllPathReturn(s.else) && (s.elif.every((e => didAllPathReturn(e.body)))));
+}
+
+
 export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : VariablesEnv) : Expr<Type> {
     switch(e.tag) {
         case "literal":
-            if( e.value.tag == "num") {
-                return { ...e, a: Type.Int };
-            } else if (e.value.tag == "true") {
-                return { ...e, a: Type.Bool }; 
-            } else if (e.value.tag == "false") {
-                return { ...e, a: Type.Bool };
+            if( e.value == Const.None) {
+                return { ...e, a: Primitive.Int };
+            } else if (e.value == Const.True) {
+                return { ...e, a: Primitive.Bool }; 
+            } else if (e.value == Const.False) {
+                return { ...e, a: Primitive.Bool };
             } else {
-                // TODO: fix none
-                return { ...e, a: Type.None };
+                return { ...e, a: Primitive.Int };
             }
         case "binary": {
             const lhs = tcExpr(e.lhs, functions, variables);
@@ -100,27 +105,27 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
                 case BinOp.Mul:
                 case BinOp.Div: 
                 case BinOp.Mod:
-                    if (lhs.a != Type.Int || rhs.a != Type.Int) {
+                    if (lhs.a != Primitive.Int || rhs.a != Primitive.Int) {
                         throw new TypeError(`Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: Type.Int, lhs, rhs};
+                    return { ...e, a: Primitive.Int, lhs, rhs};
                 case BinOp.Equal:
                 case BinOp.Unequal:
                     if (lhs.a != rhs.a) {
                         throw new TypeError(`Expected lhs and rhs to be same type but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: Type.Bool, lhs, rhs};
+                    return { ...e, a: Primitive.Bool, lhs, rhs};
                 case BinOp.Gt: 
                 case BinOp.Ge:
                 case BinOp.Lt:
                 case BinOp.Le:
-                    if (lhs.a != Type.Int || rhs.a != Type.Int) {
+                    if (lhs.a != Primitive.Int || rhs.a != Primitive.Int) {
                         throw new TypeError(`Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: Type.Bool, lhs, rhs };
+                    return { ...e, a: Primitive.Bool, lhs, rhs };
                 case BinOp.Is: 
                     // todo: fix this
-                    return { ...e, a: Type.Bool, lhs, rhs };
+                    return { ...e, a: Primitive.Bool, lhs, rhs };
             }
         }
 
@@ -128,15 +133,15 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
             const expr = tcExpr(e.expr, functions, variables);
             switch(e.op) {
                 case UniOp.Not: 
-                    if (expr.a != Type.Bool) {
+                    if (expr.a != Primitive.Bool) {
                         throw new TypeError(`Expected type BOOL but got type ${expr.a}`)
                     }
-                    return { ...e, a: Type.Bool, expr: expr };
+                    return { ...e, a: Primitive.Bool, expr: expr };
                 case UniOp.Neg: 
-                    if (expr.a != Type.Int) {
+                    if (expr.a != Primitive.Int) {
                         throw new TypeError(`Expected type INT but got type ${expr.a}`)
                     }
-                    return { ...e, a: Type.Int, expr: expr };
+                    return { ...e, a: Primitive.Int, expr: expr };
             }
         }
         case "name": {
@@ -150,7 +155,7 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
             if(e.name === "print") {
                 if(e.args.length !== 1) { throw new Error("print expects a single argument"); }
                 const newArgs = [tcExpr(e.args[0], functions, variables)];
-                const res : Expr<Type> = { ...e, a: Type.None, args: newArgs } ;
+                const res : Expr<Type> = { ...e, a: Primitive.None, args: newArgs } ;
                 return res;
             }
             let [found, t] = lookUpFunc(functions, e.name, false);
@@ -173,62 +178,79 @@ export function tcExpr(e : Expr<any>, functions : FunctionsEnv, variables : Vari
     }
 }
 
+export function tcFuncStmt(s : FuncStmt<any>, functions : FunctionsEnv, variables : VariablesEnv, currentReturn : Type) : FuncStmt<Type> {
+    if (s.ret !== Primitive.None && !didAllPathReturn(s.body)) {
+        throw new Error(`All path in function ${s.name} must have a return statement`);
+    }
+    functions = enterNewFunctionScope(functions);
+    variables = enterNewVariableScope(variables);
 
-export function didAllPathReturn(stmts: Stmt<any>[]): boolean {
-    return stmts.some( s => (s.tag == "return") || (s.tag == "if") && didAllPathReturn(s.if.body) && didAllPathReturn(s.else) && (s.elif.every((e => didAllPathReturn(e.body)))));
+    // define param
+    s.params.forEach(p => defineNewVar(variables, p.name, p.type));
+
+    // define local variables and functions
+    s.body.forEach(s => {
+        if (s.tag == "func") defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
+        else if (s.tag == "var") defineNewVar(variables, s.var.name, s.var.type);
+    })
+
+    checkDefinition(s.body);
+    const newBody = s.body.map(bs => tcStmt(bs, functions, variables, s.ret));
+    
+    exitCurrentFunctionScope(functions);
+    exitCurrentVariableScope(variables);
+    return { ...s, body: newBody };
+}
+
+
+export function tcVarStmt(s : VarStmt<any>, functions : FunctionsEnv, variables : VariablesEnv, currentReturn : Type) : VarStmt<Type> {
+    const rhs = tcExpr(s.value, functions, variables);
+    if ( rhs.tag != "literal") {
+        throw new Error(`can only initialize variable with literal`);
+    }
+    if ( rhs.a != s.var.type) {
+        throw new TypeError(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
+    }
+    return { ...s, value: rhs };
 }
 
 
 export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : VariablesEnv, currentReturn : Type) : Stmt<Type> {
-    switch(s.tag) {    
-        case "assign": {
-            const rhs = tcExpr(s.value, functions, variables);
-            if (s.var.type != undefined) {
-                if ( rhs.tag != "literal") {
-                    throw new Error(`can only initialize variable with literal`);
-                }
-                if ( rhs.a != s.var.type) {
-                    throw new TypeError(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
-                }
-            } else {
-                const [found, t] = lookUpVar(variables, s.var.name, true);
-                if (!found) {
-                    throw new ReferenceError(`Reference error: ${s.var.name} is not defined`);
-                }
-                if( t !== rhs.a) {
-                    throw new TypeError(`Cannot assign ${rhs.a} to ${t}`);
-                }
-            }
-            return { ...s, value: rhs };
+    switch(s.tag) {
+        case "func": {
+            return tcFuncStmt(s, functions, variables, currentReturn);
         }
 
-        case "func": {
-            if (s.ret !== Type.None && !didAllPathReturn(s.body)) {
-                throw new Error(`All path in function ${s.name} must have a return statement`);
+        case "var": {
+            return tcVarStmt(s, functions, variables, currentReturn);
+        }
+
+        case "class": {
+            const fields = s.fields.map((v)=>tcVarStmt(v, functions, variables, currentReturn)); //TODO: pass class info
+            const methods = s.methods.map((v)=>tcFuncStmt(v, functions, variables, currentReturn));
+            return {
+                ...s,
+                fields,
+                methods
             }
-            functions = enterNewFunctionScope(functions);
-            variables = enterNewVariableScope(variables);
+        }
 
-            // define param
-            s.params.forEach(p => defineNewVar(variables, p.name, p.type));
-
-            // define local variables and functions
-            s.body.forEach(s => {
-                if (s.tag == "func") defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
-                else if (s.tag == "assign" && s.var.type != undefined) defineNewVar(variables, s.var.name, s.var.type);
-            })
-
-            checkDefinition(s.body);
-            const newBody = s.body.map(bs => tcStmt(bs, functions, variables, s.ret));
+        case "assign": {
+            const rhs = tcExpr(s.value, functions, variables);
+            const [found, t] = lookUpVar(variables, s.name, true);
+            if (!found) {
+                throw new ReferenceError(`Reference error: ${s.name} is not defined`);
+            }
+            if( t !== rhs.a) {
+                throw new TypeError(`Cannot assign ${rhs.a} to ${t}`);
+            }
             
-            exitCurrentFunctionScope(functions);
-            exitCurrentVariableScope(variables);
-            return { ...s, body: newBody };
+            return { ...s, value: rhs };
         }
 
         case "if": {
             const newIfCond = tcExpr(s.if.cond, functions, variables);
-            if(newIfCond.a != Type.Bool) {
+            if(newIfCond.a != Primitive.Bool) {
                 throw new TypeError("Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
@@ -240,7 +262,7 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
 
             const newElif = s.elif.map(bs => {
                 let cond = tcExpr(bs.cond, functions, variables);
-                if(cond.a != Type.Bool) {
+                if(cond.a != Primitive.Bool) {
                     throw new TypeError("Expect type BOOL in condition")
                 }
                 // functions = enterNewFunctionScope(functions);
@@ -268,7 +290,7 @@ export function tcStmt(s : Stmt<any>, functions : FunctionsEnv, variables : Vari
 
         case "while": {
             const newCond = tcExpr(s.while.cond, functions, variables);
-            if(newCond.a != Type.Bool) {
+            if(newCond.a != Primitive.Bool) {
                 throw new TypeError("Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
@@ -327,11 +349,11 @@ export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
     // define all the functions and variables
     p.forEach(s => {
         if (s.tag == "func") defineNewFunc(functions, s.name, [s.params.map(p => p.type), s.ret]);
-        else if (s.tag == "assign" && s.var.type != undefined) defineNewVar(variables, s.var.name, s.var.type);
+        else if (s.tag == "var") defineNewVar(variables, s.var.name, s.var.type);
     })
 
     return p.map(s => {
-        const res = tcStmt(s, functions, variables, Type.None);
+        const res = tcStmt(s, functions, variables, Primitive.None);
         return res;
     });
 }

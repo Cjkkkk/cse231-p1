@@ -1,7 +1,7 @@
 import { assert } from "chai";
 import { parser } from "lezer-python";
 import { TreeCursor } from "lezer-tree";
-import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody } from "./ast";
+import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody, Primitive, Const, FuncStmt, VarStmt } from "./ast";
 
 
 export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
@@ -28,9 +28,9 @@ export function traverseType(c : TreeCursor, s : string): Type {
         case "VariableName": {
             const name = s.substring(c.from, c.to);
             if(name == "int") {
-                type = Type.Int;
+                type = Primitive.Int;
             } else if(name == "bool") {
-                type = Type.Bool;
+                type = Primitive.Bool;
             } else {
                 throw new Error("Unknown type: " + name);
             }
@@ -71,13 +71,13 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
     switch(c.type.name) {
         case "Boolean": {
             if (s.substring(c.from, c.to) == "True") {
-                return { tag: "literal", value: { tag: "true"} };
+                return { tag: "literal", value: Const.True };
             } else {
-                return { tag: "literal", value: { tag: "false"} };
+                return { tag: "literal", value: Const.False };
             }
         }
         case "None":
-            return { tag: "literal", value: { tag: "none"} };
+            return { tag: "literal", value: Const.None };
         case "Number":
             return { tag: "literal", value: { tag: "num", value: Number(s.substring(c.from, c.to))} }
         case "VariableName":
@@ -210,6 +210,31 @@ export function traverseBody(c: TreeCursor, s: string): Stmt<any>[] {
 export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
     var originName = c.node.type.name;
     switch(c.node.type.name) {      
+        case "ClassDefinition": {
+            c.firstChild(); // class
+            c.nextSibling();
+            const name = s.substring(c.from, c.to); // class name
+            c.nextSibling(); // body
+            const body = traverseBody(c, s);
+            const fields: VarStmt<any>[] = [];
+            const methods: FuncStmt<any>[] = [];
+            body.forEach((b) => {
+                if(b.tag == "func") {
+                    methods.push(b);
+                }
+                else if(b.tag == "var") {
+                    fields.push(b);
+                } else {
+                    throw new Error("");
+                }
+            })
+            return {
+                tag: "class",
+                name,
+                methods,
+                fields
+            };
+        }
         case "AssignStatement": {
             c.firstChild(); // go to name
             const name = s.substring(c.from, c.to);
@@ -223,10 +248,18 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             const value = traverseExpr(c, s);
             c.parent();
             assert(c.node.type.name == originName);
-            return {
-                tag: "assign",
-                var: {name, type},
-                value: value
+            if (type == undefined) {
+                return {
+                    tag: "assign",
+                    name,
+                    value: value
+                }
+            } else {
+                return {
+                    tag: "var",
+                    var: {name, type},
+                    value: value
+                }
             }
         }
         case "FunctionDefinition": {
@@ -236,7 +269,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // Focus on ParamList
             var params = traverseParameters(c, s)
             c.nextSibling(); // Focus on Body or TypeDef
-            var ret : Type = Type.None;
+            var ret : Type = Primitive.None;
             var maybeTD = c;
             if(maybeTD.type.name === "TypeDef") {
                 ret = traverseType(c, s);
@@ -300,7 +333,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.firstChild(); // return keyword
             var maybeRet = c.nextSibling();
             var dummyC = c;
-            var returnExpr: Expr<any> = {tag: "literal", value: {tag: "none"}};
+            var returnExpr: Expr<any> = {tag: "literal", value: Const.None};
             if (maybeRet && dummyC.node.type.name != "⚠") {
                 returnExpr = traverseExpr(c, s);
             }

@@ -1,5 +1,5 @@
 import wabt from 'wabt';
-import {Stmt, Expr, Type, BinOp, UniOp} from './ast';
+import {Stmt, Expr, Type, BinOp, UniOp, Const, Primitive} from './ast';
 import {parse} from './parser';
 import {tcProgram } from './tc';
 
@@ -9,7 +9,7 @@ var loop_label = 0;
 function variableNames(stmts: Stmt<Type>[]) : string[] {
     const vars : Array<string> = [];
     stmts.forEach((stmt) => {
-        if(stmt.tag === "assign" && stmt.var.type != undefined) { vars.push(stmt.var.name); }
+        if(stmt.tag === "var") { vars.push(stmt.var.name); }
     });
     return vars;
 }
@@ -67,15 +67,15 @@ export function unaryOpStmts(op : UniOp) {
 export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
     switch(expr.tag) {
         case "literal": {
-            if( expr.value.tag == "num") {
-                return [`i32.const ${expr.value.value}`];
-            } else if (expr.value.tag == "true") {
+            // TODO: fix none
+            if( expr.value == Const.None) {
+                return [`i32.const 0`];
+            } else if (expr.value == Const.True) {
                 return [`i32.const 1`];
-            } else if (expr.value.tag == "false") {
+            } else if (expr.value == Const.False) {
                 return [`i32.const 0`];
             } else {
-                // TODO: fix none
-                return [`i32.const 0`];
+                return [`i32.const ${expr.value.value}`];
             }
         }
         case "name": {
@@ -104,9 +104,9 @@ export function codeGenExpr(expr : Expr<Type>, locals : Env) : Array<string> {
             let toCall = expr.name;
             if(expr.name === "print") {
                 switch(expr.args[0].a) {
-                    case Type.Bool: toCall = "print_bool"; break;
-                    case Type.Int: toCall = "print_num"; break;
-                    case Type.None: toCall = "print_none"; break;
+                    case Primitive.Bool: toCall = "print_bool"; break;
+                    case Primitive.Int: toCall = "print_num"; break;
+                    case Primitive.None: toCall = "print_none"; break;
                 }
             }
             valStmts.push(`call $${toCall}`);
@@ -139,10 +139,16 @@ export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
                     `i32.const 0`,
                     `)`];
         }
-        case "assign": {
+        case "var": {
             var valStmts = codeGenExpr(stmt.value, locals);
             if(locals.has(stmt.var.name)) { valStmts.push(`local.set $${stmt.var.name}`); }
             else { valStmts.push(`global.set $${stmt.var.name}`); }
+            return valStmts;
+        }
+        case "assign": {
+            var valStmts = codeGenExpr(stmt.value, locals);
+            if(locals.has(stmt.name)) { valStmts.push(`local.set $${stmt.name}`); }
+            else { valStmts.push(`global.set $${stmt.name}`); }
             return valStmts;
         }
         case "if": {

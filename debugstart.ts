@@ -47,8 +47,22 @@ def f1() -> int:
     return test
 `
 
+source = `
+class A:
+    a: int = 1
+    b: bool = True
+    def new(self: A, a: int, b: bool):
+        self.a = a
+        self.b = b
+
+`
+
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
 
 const stmts = parse(source);
 console.log(stmts)
+
+enum Const {a, b, c}
+type Literal = Const | { tag: "num", value: number}
+console.log(Const.a in Const)
