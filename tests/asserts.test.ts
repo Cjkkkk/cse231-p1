@@ -1,7 +1,7 @@
 import "mocha";
 import { expect } from "chai";
 import { importObject } from "./import-object.test";
-import {run, typeCheck} from "./helpers.test";
+import { run, typeCheck} from "./helpers.test";
 import { fail } from 'assert'
 
 

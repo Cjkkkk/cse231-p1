@@ -113,6 +113,9 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
                     case "int": toCall = "print_num"; break;
                     case "none": toCall = "print_none"; break;
                 }
+            } else if(classEnv.has(expr.name)) {
+                // is class init call
+                toCall = expr.name + "$__init__";
             }
             valStmts.push(`call $${toCall}`);
             return valStmts;
@@ -144,8 +147,21 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
 export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) : Array<string> {
     switch(stmt.tag) {
         case "class": {
-            const stmts = stmt.methods.map((f) => codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv)).flat();
-            return stmts;
+            let size = classEnv.get(stmt.name).get("0");
+            // generate for __init__ function
+            // might have defined this in the code
+            // TODO: insert these code into init
+            let initFuncStmts = [
+                `global.get $heap`,
+                `global.get $heap`,
+                `i32.const ${size}`,
+                `i32.add`,
+                `global.set $heap`,
+                `local.set $self`
+            ];
+
+            let methodsStmts = stmt.methods.map((f) => codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv)).flat();
+            return methodsStmts;
         }
         case "func": {
             const newLocals = new Set(locals);
@@ -160,45 +176,32 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
             
             const stmts = stmt.body.map(s => codeGenStmt(s, newLocals, classEnv)).flat();
             return [`(func $${stmt.name} ${params} (result i32)`,
-                    `(local $scratch i32)`,
+                    `local $scratch i32`,
                     ...varDecls,
                     ...stmts,
                     `i32.const 0`,
                     `)`];
         }
         case "var": {
-            var valStmts: string[] = [];
-            if (isClass(stmt.var.type)) {
-                // allocate memory on stack
-                let m = -1;
-                classEnv.get(stmt.var.type).forEach((v, _) => {m = Math.max(v, m)});
-                valStmts = [
-                    `global.get $heap`,
-                    `global.get $heap`,
-                    `i32.const ${m + 4}`,
-                    `i32.add`,
-                    `global.set $heap`
-                ];
-            } else {
-                valStmts = codeGenExpr(stmt.value, locals, classEnv);
-            }
-
+            var valStmts = codeGenExpr(stmt.value, locals, classEnv);
             if(locals.has(stmt.var.name)) { valStmts.push(`local.set $${stmt.var.name}`); }
             else { valStmts.push(`global.set $${stmt.var.name}`); }
             return valStmts;
         }
         case "assign": {
-            var objStmts = codeGenExpr(stmt.name, locals, classEnv);
-            var valStmts = codeGenExpr(stmt.value, locals, classEnv);
             if (stmt.name.tag === "name") {
-                if(locals.has(stmt.name.name)) { valStmts.push(`local.set $${stmt.name}`); }
-                else { valStmts.push(`global.set $${stmt.name}`); }
+                var valStmts = codeGenExpr(stmt.value, locals, classEnv);
+                if(locals.has(stmt.name.name)) { valStmts.push(`local.set $${stmt.name.name}`); }
+                else { valStmts.push(`global.set $${stmt.name.name}`); }
+                return valStmts;
             } else {
+                var objStmts = codeGenExpr(stmt.name, locals, classEnv);
+                var valStmts = codeGenExpr(stmt.value, locals, classEnv);
                 // getfield as lhs
                 objStmts.pop(); // should not load
                 valStmts.push(`i32.store`);
+                return [...objStmts, ...valStmts];
             }
-            return [...objStmts, ...valStmts];
         }
         case "if": {
             var result = [];
@@ -275,6 +278,27 @@ function addIndent(stmts: Array<string>, ident: number) :Array<string> {
     return stmts;
 }
 
+function getTypeSize(classEnv: ClassEnv, type: Type): number {
+    if (!isClass(type)) return 4; //primitive are all 4 bytes long
+    else {
+        classEnv.get(type).get("0");
+    }
+}
+
+
+function calculateOffset(classEnv: ClassEnv, stmt: ClassStmt<any>) {
+    const env = new Map<string, number>();
+    let currentOffset = 0;
+    stmt.fields.forEach((f) => {
+        env.set(f.var.name, currentOffset);
+        currentOffset += getTypeSize(classEnv, f.var.type);
+    });
+
+    env.set("0", currentOffset);
+    classEnv.set(stmt.name, env);
+}
+
+
 export function compile(source : string) : string {
     let ast = parse(source);
     ast = tcProgram(ast);
@@ -284,13 +308,7 @@ export function compile(source : string) : string {
     const classEnv = new Map<string, Map<string, number>>();
 
     classes.forEach((c) => {
-        const env = new Map<string, number>();
-        let i = 0;
-        (c as ClassStmt<string>).fields.forEach((f) => {
-            env.set(f.var.name, i * 4);
-            i += 1;
-        })
-        classEnv.set((c as ClassStmt<string>).name, env);
+        calculateOffset(classEnv, (c as ClassStmt<string>));
     });
 
     const classCode = classes.map(f => addIndent(codeGenStmt(f, locals, classEnv), 1)).map(f=> f.join("\n")).join("\n\n");
@@ -304,9 +322,9 @@ export function compile(source : string) : string {
     var main = "";
     if(isExpr) {
         retType = "(result i32)";
-        main = addIndent([`(local $scratch i32)`, ...allStmts, "local.get $scratch"], 2).join("\n");
+        main = addIndent([`local $scratch i32`, ...allStmts, "local.get $scratch"], 2).join("\n");
     } else {
-        main = addIndent([`(local $scratch i32)`, ...allStmts], 2).join("\n");
+        main = addIndent([`local $scratch i32`, ...allStmts], 2).join("\n");
     }
 
     return `

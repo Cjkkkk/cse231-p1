@@ -135,22 +135,30 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             if(!found) {
                 throw new ReferenceError(`function ${e.name} is not defined`);
             }
-            if(t.tag != "func") {
-                throw new ReferenceError(`${e.name} is not a function`);
-            } 
             
-            const [args, ret] = t.type;
-            if(args.length !== e.args.length) {
-                throw new Error(`Expected ${args.length} arguments but got ${e.args.length}`);
+            if(t.tag === "func") {
+                const [args, ret] = t.type;
+                if(args.length !== e.args.length) {
+                    throw new Error(`Expected ${args.length} arguments but got ${e.args.length}`);
+                }
+
+                const newArgs = args.map((a, i) => {
+                    const argtyp = tcExpr(e.args[i], envList);
+                    if(a !== argtyp.a) { throw new TypeError(`Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
+                    return argtyp
+                });
+
+                return { ...e, a: ret, args: newArgs };
+            } else if (t.tag === "class") {
+                // calling init function
+                // init function should not call with any parameters
+                if(0 !== e.args.length) {
+                    throw new Error(`Expected ${0} arguments but got ${e.args.length}`);
+                }
+                return { ...e, a: e.name };
+            } else {
+                throw new ReferenceError(`${e.name} is not a function or class`);
             }
-
-            const newArgs = args.map((a, i) => {
-                const argtyp = tcExpr(e.args[i], envList);
-                if(a !== argtyp.a) { throw new TypeError(`Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
-                return argtyp
-            });
-
-            return { ...e, a: ret, args: newArgs };
         }
         case "getfield": {
             const newObj = tcExpr(e.obj, envList);
@@ -252,6 +260,30 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         }
 
         case "class": {
+            // if (!s.methods.some((v) => v.name === "__init__")) {
+            //     // did not define __init__ function
+            //     // define an empty __init__ function
+            //     s.methods.push({tag: "func", 
+            //         name: "__init__", 
+            //         params: [{name: "self", type: s.name}], 
+            //         ret: s.name, 
+            //         body: [
+            //             {tag: "assign", 
+            //                 name: {tag: "name", name: "self"}, 
+            //                 value: {tag: "name", name: "heap"}
+            //             },
+            //             {tag: "assign",
+            //                 name: {tag: "name", name: "heap"}, 
+            //                 value: {
+            //                     tag: "binary", 
+            //                     op: BinOp.Plus, 
+            //                     lhs: {tag: "name", name: "heap"}, 
+            //                     rhs: {tag: "literal", value: 1}}},
+            //             {tag: "return", value: {tag: "name", name: "self"}}
+            //         ]})
+            // }
+
+            // TODO: check if redefine class or method or field!
             const fields = s.fields.map((v)=>tcVarStmt(v, envList, currentReturn)); //TODO: pass class info
             const methods = s.methods.map((v)=>tcFuncStmt(v, envList, currentReturn));
             return {
