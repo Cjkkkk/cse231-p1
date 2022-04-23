@@ -238,8 +238,10 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             if (!isClass(name)) {
                 throw new Error(`can not define class with name: ${name}`)
             }
-            // c.nextSibling(); // object
-            // if (c.node.type.name === "ArgList") 
+            c.nextSibling(); 
+            // inheritance
+            // ignore it for now
+            const args = traverseArgs(c, s);
             c.nextSibling(); // body
             const body = traverseBody(c, s);
             const fields: VarStmt<any>[] = [];

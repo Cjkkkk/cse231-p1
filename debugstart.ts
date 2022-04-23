@@ -49,7 +49,7 @@ def f1() -> int:
 `
 
 source = `
-class A:
+class A(object):
     a: int = 1
     b: bool = True
     def new(self: A, a: int, b: bool):
