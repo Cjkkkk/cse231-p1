@@ -125,7 +125,7 @@ export function codeGenStmt(stmt : Stmt<Type>, locals : Env) : Array<string> {
             // Construct the environment for the function body
             const variables = variableNames(stmt.body);
             // Construct the code for params and variable declarations in the body
-            const params = stmt.params.map(p => `(param $${p.name} i32)`);
+            const params = stmt.params.map(p => `(param $${p.name} i32)`).join(" ");
             const varDecls = variables.map(v => `(local $${v} i32)`);
             
             variables.forEach(v => newLocals.add(v));
