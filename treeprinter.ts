@@ -4,7 +4,7 @@ export function stringifyTree(t: TreeCursor, source: string, d:number) {
     var str = "";
     var spaces = " ".repeat(d*2);
     str += spaces + t.type.name;
-    if(["Number", "CallExpression", "BinaryExpression", "UnaryExpression", "ArithOp", "VariableName"].includes(t.type.name)) {
+    if(["Number", "CallExpression", "BinaryExpression", "UnaryExpression", "ArithOp", "VariableName", "PropertyName"].includes(t.type.name)) {
         str += "-->" + source.substring(t.from, t.to);
     }
 

@@ -1,6 +1,7 @@
 import { parser } from "lezer-python";
 import { stringifyTree } from "./treeprinter";
 import { parse } from "./parser";
+import { compile } from "./compiler";
 
 var source = `
 if a > 1:
@@ -55,14 +56,94 @@ class A:
         self.a = a
         self.b = b
 
+a:A = None
+a.new(4, True)
+a.a
 `
 
+// // Script
+// //   ExpressionStatement
+// //     MemberExpression
+// //       MemberExpression
+// //         VariableName-->a
+// //         .
+// //         PropertyName
+// //       .
+// //       PropertyName
+
+// source = `
+// a.A.A
+// `
+
+// // Script
+// //   ExpressionStatement
+// //     CallExpression-->a.A.A()
+// //       MemberExpression
+// //         MemberExpression
+// //           VariableName-->a
+// //           .
+// //           PropertyName-->A
+// //         .
+// //         PropertyName-->A
+// //       ArgList
+// //         (
+// //         )
+// source = `
+// a.A.A()
+// `
+
+// // Script
+// //   ExpressionStatement
+// //     CallExpression-->A()
+// //       VariableName-->A
+// //       ArgList
+// //         (
+// //         )
+
+// source = `
+// A()
+// `
+
+
+// // Script
+// //   ExpressionStatement
+// //     CallExpression-->a.A()
+// //       MemberExpression
+// //         VariableName-->a
+// //         .
+// //         PropertyName-->A
+// //       ArgList
+// //         (
+// //         )
+
+// source = `
+// a.A()
+// `
+
+// // Script
+// //   ExpressionStatement
+// //     CallExpression-->a.A().B()
+// //       MemberExpression
+// //         CallExpression-->a.A()
+// //           MemberExpression
+// //             VariableName-->a
+// //             .
+// //             PropertyName-->A
+// //           ArgList
+// //             (
+// //             )
+// //         .
+// //         PropertyName-->B
+// //       ArgList
+// //         (
+// //         )
+
+// source = `
+// a.!().B()
+// `
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
 
-const stmts = parse(source);
-console.log(stmts)
-
-enum Const {a, b, c}
-type Literal = Const | { tag: "num", value: number}
-console.log(Const.a in Const)
+// const stmts = parse(source);
+// console.log(stmts)
+console.log(compile(source))
