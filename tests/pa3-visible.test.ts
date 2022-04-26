@@ -109,7 +109,7 @@ print(c2.x)
     def clear(self: C) -> C:
       return self.new(123)
   
-  C().new(42).clear()`, ["123", "42", "42", "123"])
+  C().new(42).clear()`, ["123", "42", "42", "12"])
   // 12
   assertFail("no-fields-for-none", `
   class C(object):

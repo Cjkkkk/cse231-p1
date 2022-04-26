@@ -24,6 +24,7 @@ export function typeCheck(source: string) : Type {
 
 // Modify run to use `importObject` (imported above) to use for printing
 export async function run(source: string) {
+    console.error(source);
     const wasmSource = compile(source);
     try {
         const v = await runT(wasmSource, importObject);
