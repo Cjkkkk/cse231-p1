@@ -26,8 +26,9 @@ export function typeCheck(source: string) : Type {
 export async function run(source: string) {
     const wasmSource = compile(source);
     try {
+        importObject.output += source;
         const v = await runT(wasmSource, importObject);
-        return source;
+        return v;
     } catch (err){
         throw new Error("RUNTIME ERROR: " + err.message)
     }
