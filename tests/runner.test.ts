@@ -412,7 +412,7 @@ describe('test functions', () => {
             `);
             assert(false);
         } catch (error) {
-            expect(error.message).to.equal("Redefine variable: x");
+            expect(error.message).to.equal("Redefine symbol: x");
         }
 
         try {
@@ -425,7 +425,7 @@ describe('test functions', () => {
             `);
             assert(false);
         } catch (error) {
-            expect(error.message).to.equal("Redefine variable: x");
+            expect(error.message).to.equal("Redefine symbol: x");
         }
     });
 

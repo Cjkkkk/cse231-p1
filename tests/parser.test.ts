@@ -37,6 +37,6 @@ describe('traverseStmt(c, s) function', () => {
         const parsedStmt = traverseStmt(cursor, source);
 
         // Note: we have to use deep equality when comparing objects
-        expect(parsedStmt).to.deep.equal({ tag: "assign", var: {name: "a", type: undefined}, value: {tag: "literal", value:1 }});
+        expect(parsedStmt).to.deep.equal({ tag: "assign", name: {name: "a", tag: "name"}, value: {tag: "literal", value:1 }});
     })
 });

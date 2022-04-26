@@ -10,6 +10,10 @@ type SymbolTableList = SymbolTable[];
 
 
 
+function isAssignable(lhs: Type, rhs: Type): boolean {
+    return lhs === rhs || (isClass(lhs) && rhs === "none")
+}
+
 function getCurrentEnv(envList : SymbolTableList): SymbolTable {
     assert(envList.length > 0);
     return envList[envList.length - 1];
@@ -75,13 +79,13 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 case BinOp.Div: 
                 case BinOp.Mod:
                     if (lhs.a != "int" || rhs.a != "int") {
-                        throw new TypeError(`Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "int", lhs, rhs};
                 case BinOp.Equal:
                 case BinOp.Unequal:
                     if (lhs.a != rhs.a) {
-                        throw new TypeError(`Expected lhs and rhs to be same type but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected lhs and rhs to be same type but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "bool", lhs, rhs};
                 case BinOp.Gt: 
@@ -89,7 +93,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 case BinOp.Lt:
                 case BinOp.Le:
                     if (lhs.a != "int" || rhs.a != "int") {
-                        throw new TypeError(`Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "bool", lhs, rhs };
                 case BinOp.Is: 
@@ -103,12 +107,12 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             switch(e.op) {
                 case UniOp.Not: 
                     if (expr.a != "bool") {
-                        throw new TypeError(`Expected type BOOL but got type ${expr.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type BOOL but got type ${expr.a}`)
                     }
                     return { ...e, a: "bool", expr: expr };
                 case UniOp.Neg: 
                     if (expr.a != "int") {
-                        throw new TypeError(`Expected type INT but got type ${expr.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${expr.a}`)
                     }
                     return { ...e, a: "int", expr: expr };
             }
@@ -144,7 +148,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
 
                 const newArgs = args.map((a, i) => {
                     const argtyp = tcExpr(e.args[i], envList);
-                    if(a !== argtyp.a) { throw new TypeError(`Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
+                    if(!isAssignable(a, argtyp.a)) { throw new TypeError(`TYPE ERROR: Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
                     return argtyp
                 });
 
@@ -206,7 +210,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             // exclude self
             const newArgs = args.slice(1).map((a, i) => {
                 const argtyp = tcExpr(e.args[i], envList);
-                if(a !== argtyp.a) { throw new TypeError(`Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
+                if(!isAssignable(a, argtyp.a)) { throw new TypeError(`TYPE ERROR: Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
                 return argtyp;
             });
             return { ...e, a: ret, obj: newObj, args: newArgs };
@@ -242,8 +246,8 @@ export function tcVarStmt(s : VarStmt<any>, envList: SymbolTableList, currentRet
     if ( rhs.tag != "literal") {
         throw new Error(`can only initialize variable with literal`);
     }
-    if ( s.var.type !== rhs.a && (!isClass(s.var.type) || rhs.a !== "none") ) {
-        throw new TypeError(`Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
+    if (!isAssignable(s.var.type, rhs.a)) {
+        throw new TypeError(`TYPE ERROR: Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
     }
     return { ...s, value: rhs };
 }
@@ -260,29 +264,6 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         }
 
         case "class": {
-            // if (!s.methods.some((v) => v.name === "__init__")) {
-            //     // did not define __init__ function
-            //     // define an empty __init__ function
-            //     s.methods.push({tag: "func", 
-            //         name: "__init__", 
-            //         params: [{name: "self", type: s.name}], 
-            //         ret: s.name, 
-            //         body: [
-            //             {tag: "assign", 
-            //                 name: {tag: "name", name: "self"}, 
-            //                 value: {tag: "name", name: "heap"}
-            //             },
-            //             {tag: "assign",
-            //                 name: {tag: "name", name: "heap"}, 
-            //                 value: {
-            //                     tag: "binary", 
-            //                     op: BinOp.Plus, 
-            //                     lhs: {tag: "name", name: "heap"}, 
-            //                     rhs: {tag: "literal", value: 1}}},
-            //             {tag: "return", value: {tag: "name", name: "self"}}
-            //         ]})
-            // }
-
             // TODO: check if redefine class or method or field!
             const fields = s.fields.map((v)=>tcVarStmt(v, envList, currentReturn)); //TODO: pass class info
             const methods = s.methods.map((v)=>tcFuncStmt(v, envList, currentReturn));
@@ -296,8 +277,14 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         case "assign": {
             const rhs = tcExpr(s.value, envList);
             const lhs = tcExpr(s.name, envList);
-            if( lhs.a !== rhs.a) {
-                throw new TypeError(`Cannot assign ${rhs.a} to ${lhs.a}`);
+            if (lhs.tag === "name") {
+                const [found, t] = lookUpSymbol(envList, lhs.name, true);
+                if (!found) {
+                    throw new ReferenceError(`Reference error: ${lhs.name} is not defined`);
+                }
+            }
+            if( !isAssignable(lhs.a, rhs.a)) {
+                throw new TypeError(`TYPE ERROR: Cannot assign ${rhs.a} to ${lhs.a}`);
             }
             
             return { ...s, name: lhs, value: rhs };
@@ -306,7 +293,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         case "if": {
             const newIfCond = tcExpr(s.if.cond, envList);
             if(newIfCond.a != "bool") {
-                throw new TypeError("Expect type BOOL in condition")
+                throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
@@ -318,7 +305,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
             const newElif = s.elif.map(bs => {
                 let cond = tcExpr(bs.cond, envList);
                 if(cond.a != "bool") {
-                    throw new TypeError("Expect type BOOL in condition")
+                    throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
                 }
                 // functions = enterNewFunctionScope(functions);
                 // variables = enterNewVariableScope(variables);
@@ -346,7 +333,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         case "while": {
             const newCond = tcExpr(s.while.cond, envList);
             if(newCond.a != "bool") {
-                throw new TypeError("Expect type BOOL in condition")
+                throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
             // variables = enterNewVariableScope(variables);
@@ -367,8 +354,8 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         }
         case "return": {
             const valTyp = tcExpr(s.value, envList);
-            if(valTyp.a !== currentReturn) {
-                throw new TypeError(`${valTyp.a} returned but ${currentReturn} expected.`);
+            if(!isAssignable(currentReturn, valTyp.a)) {
+                throw new TypeError(`TYPE ERROR: ${valTyp.a} returned but ${currentReturn} expected.`);
             }
             return { ...s, value: valTyp };
         }

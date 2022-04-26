@@ -1,7 +1,6 @@
 class C(object):
-  x : int = 1
+    x : int = 0
 
-c1: C = None
-c1 = C()
-c1.x = 123
-print(c1.x)
+c : C = None
+c = C()
+c.x
