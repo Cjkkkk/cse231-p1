@@ -145,36 +145,44 @@ a.a
 // `
 
 
-type Type =
-  | "int"
-  | "bool"
-  | "none"
-  | { tag: "object", class: string }
+// type Type =
+//   | "int"
+//   | "bool"
+//   | "none"
+//   | { tag: "object", class: string }
 
-function typeCheck(source: string) : Type {
-    const stmts = parse(source);
-    const types = tcProgram(stmts);
-    const lastType = (types[types.length - 1] as ExprStmt<any>).expr.a;
-    console.log(types[types.length - 1])
-    if (lastType === "int" || lastType === "bool" || lastType === "none") return lastType;
-    else {
-        return {tag: "object", class: lastType};
-    }
-}
+// function typeCheck(source: string) : Type {
+//     const stmts = parse(source);
+//     const types = tcProgram(stmts);
+//     const lastType = (types[types.length - 1] as ExprStmt<any>).expr.a;
+//     console.log(types[types.length - 1])
+//     if (lastType === "int" || lastType === "bool" || lastType === "none") return lastType;
+//     else {
+//         return {tag: "object", class: lastType};
+//     }
+// }
 
 
-console.log(typeCheck(`
-x : int = 1
-y : int = 2
-if x < y:
-    pass
-else:
-    x = -x
-x
-`))
-// const t = parser.parse(source);
-// console.log(stringifyTree(t.cursor(), source, 0));
+// console.log(typeCheck(`
+// x : int = 1
+// y : int = 2
+// if x < y:
+//     pass
+// else:
+//     x = -x
+// x
+// `))
 
-// const stmts = parse(source);
-// console.log(stmts)
-// console.log(compile(source))
+source = `
+class C(object):
+    def f(self: C) -> int:
+        if True:
+            return 0
+        else:
+            return`
+const t = parser.parse(source);
+console.log(stringifyTree(t.cursor(), source, 0));
+
+const stmts = parse(source);
+console.log(stmts)
+console.log(compile(source))

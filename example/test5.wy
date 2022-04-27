@@ -1,6 +1,4 @@
-class C(object):
-    x : int = 0
-
-c : C = None
-c = C()
-c.x
+ class C(object):
+    n : int = 0
+    def __init__(self: C):
+        self.n = 1

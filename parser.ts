@@ -252,8 +252,6 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
                 }
                 else if(b.tag === "var") {
                     fields.push(b);
-                } else {
-                    throw new Error("");
                 }
             })
             c.parent();

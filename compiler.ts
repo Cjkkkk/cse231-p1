@@ -115,6 +115,7 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
                 }
             } else if(classEnv.has(expr.name)) {
                 // is class init call
+                valStmts.push(`i32.const -2147483648`);
                 toCall = expr.name + "$__init__";
             }
             valStmts.push(`call $${toCall}`);
@@ -148,7 +149,7 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
     switch(stmt.tag) {
         case "class": {
             // generate for __init__ function
-            let initFuncStmts = [`(func $${stmt.name}$__init__  (result i32)`];
+            let initFuncStmts = [`(func $${stmt.name}$__init__ (param $self i32) (result i32)`];
             stmt.fields.map((f, i)=>{
                 initFuncStmts.push(
                     `global.get $heap`,
@@ -167,8 +168,19 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
                 `)`
             );
 
-            let methodsStmts = stmt.methods.map((f) => codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv)).flat();
-            return [...initFuncStmts, ...methodsStmts];
+            let methodsStmts = stmt.methods.map((f) => {
+                let stmts = codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv);
+                if (f.name === "__init__") {
+                    stmts = [...initFuncStmts, `local.set $self`, ...stmts.slice(1), `local.get $self`]
+                }
+                return stmts;
+            }).flat();
+
+            if (stmt.methods.some((f)=>f.name === "__init__")) {
+                return methodsStmts;
+            } else {
+                return [...initFuncStmts, ...methodsStmts];
+            }
         }
         case "func": {
             const newLocals = new Set(locals);

@@ -78,26 +78,29 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 case BinOp.Mul:
                 case BinOp.Div: 
                 case BinOp.Mod:
-                    if (lhs.a != "int" || rhs.a != "int") {
+                    if (lhs.a !== "int" || rhs.a !== "int") {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "int", lhs, rhs};
                 case BinOp.Equal:
                 case BinOp.Unequal:
-                    if (lhs.a != rhs.a) {
-                        throw new TypeError(`TYPE ERROR: Expected lhs and rhs to be same type but got type ${lhs.a} and type ${rhs.a}`)
+                    if (lhs.a !== rhs.a || (lhs.a !== "int" && lhs.a !== "bool")) {
+                        throw new TypeError(`TYPE ERROR: Expected lhs and rhs to be same type of INT or BOOL but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "bool", lhs, rhs};
                 case BinOp.Gt: 
                 case BinOp.Ge:
                 case BinOp.Lt:
                 case BinOp.Le:
-                    if (lhs.a != "int" || rhs.a != "int") {
+                    if (lhs.a !== "int" || rhs.a !== "int") {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "bool", lhs, rhs };
                 case BinOp.Is: 
                     // todo: fix this
+                    if (lhs.a === "int" || rhs.a == "int" || lhs.a === "bool" || rhs.a === "bool" ) {
+                        throw new TypeError(`TYPE ERROR: Expected type NONE or CLASS but got type ${lhs.a} and type ${rhs.a}`)
+                    }
                     return { ...e, a: "bool", lhs, rhs };
             }
         }
@@ -220,7 +223,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
 
 export function tcFuncStmt(s : FuncStmt<any>, envList: SymbolTableList, currentReturn : Type) : FuncStmt<Type> {
     if (s.ret !== "none" && !didAllPathReturn(s.body)) {
-        throw new Error(`All path in function ${s.name} must have a return statement`);
+        throw new TypeError(`TYPE ERROR: All path in function ${s.name} must have a return statement`);
     }
     envList = enterNewEnv(envList);
 
@@ -267,6 +270,13 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
             // TODO: check if redefine class or method or field!
             const fields = s.fields.map((v)=>tcVarStmt(v, envList, currentReturn)); //TODO: pass class info
             const methods = s.methods.map((v)=>tcFuncStmt(v, envList, currentReturn));
+            methods.forEach((m)=>{
+                if (m.name === "__init__") {
+                    if (m.params.length !== 1 || m.params[0].name !== "self" || m.ret !== "none") {
+                        throw new TypeError("TYPE ERROR: define __init__ with different signature")
+                    }
+                }
+            })
             return {
                 ...s,
                 fields,

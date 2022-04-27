@@ -184,4 +184,68 @@ print(c2.x)
     x : int = 0
   c : C = None
   c = None`, NONE);
+
+  
+  // spy
+  // 21
+  assertTCFail("return-id",`
+  class C(object):
+    x : int = 0
+    def f(self: C) -> int:
+      x`)
+  // 22
+  assertTCFail("no-return-just-expr",`
+  class C(object):
+    def f(self: C) -> int:
+      1`)
+
+  // 23
+  assertTCFail("return-in-one-branch",`
+  class C(object):
+    def f(self: C) -> int:
+      1`)
+  // 24
+  assertTCFail("return-none-in-branch",`
+  class C(object):
+  def f(self: C) -> int:
+    if True:
+      return 0
+    else:
+      return`)
+
+  assertTCFail("is-num",`
+  x : int = 0
+  y : int = 0
+  y = x
+  x is y`)
+  
+  assertTCFail("eq-class",`
+  class C(object):
+    x : int = 0
+  C() == C()`)
+  
+  assertTCFail("init-no-args",`
+  class C(object):
+    n : int = 0
+    def __init__(self: C, n : int):
+      self.n = n`)
+  
+  assertTCFail("init-ret-type-1",`
+  class C(object):
+    n : int = 0
+    def __init__(self: C) -> C:
+      self.n = 1`)
+//   assertTCFail("init-gets-called",`
+//   class C(object):
+//     n : int = 0
+//     def __init__(self: C):
+//       self.n = 1`)
+  assertTCFail("expr-not-ret-type",`
+  class C(object):
+    def f(self: C) -> int:
+      if True:
+        return 0
+      else:
+        1`)
 });
+
