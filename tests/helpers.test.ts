@@ -7,8 +7,6 @@ import { importObject } from './import-object.test';
 
 // Modify typeCheck to return a `Type` as we have specified below
 export function typeCheck(source: string) : Type {
-    console.error(source)
-    console.log(source)
     const stmts = parse(source);
     const newStmts = tcProgram(stmts);
     const lastStmt = newStmts[newStmts.length - 1];
