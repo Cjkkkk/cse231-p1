@@ -64,13 +64,13 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
     switch(c.type.name) {
         case "Boolean": {
             if (s.substring(c.from, c.to) === "True") {
-                return { tag: "literal", value: "true" };
+                return { tag: "literal", value: true };
             } else {
-                return { tag: "literal", value: "false" };
+                return { tag: "literal", value: false };
             }
         }
         case "None":
-            return { tag: "literal", value: "none" };
+            return { tag: "literal", value: "None" };
         case "Number":
             return { tag: "literal", value: Number(s.substring(c.from, c.to)) }
         case "self":
@@ -363,7 +363,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.firstChild(); // return keyword
             var maybeRet = c.nextSibling();
             var dummyC = c;
-            var returnExpr: Expr<any> = {tag: "literal", value: "none"};
+            var returnExpr: Expr<any> = {tag: "literal", value: "None"};
             if (maybeRet && dummyC.node.type.name != "⚠") {
                 returnExpr = traverseExpr(c, s);
             }

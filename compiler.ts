@@ -1,5 +1,5 @@
 import wabt from 'wabt';
-import {Stmt, Expr, Type, BinOp, UniOp, ClassStmt, isClass} from './ast';
+import {Stmt, Expr, Type, BinOp, UniOp, ClassStmt, isClass, LiteralExpr, FuncStmt} from './ast';
 import {parse} from './parser';
 import {tcProgram } from './tc';
 
@@ -72,11 +72,11 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
     switch(expr.tag) {
         case "literal": {
             // TODO: fix none
-            if( expr.value === "none") {
+            if( expr.value === "None") {
                 return [`i32.const -2147483648`];
-            } else if (expr.value === "true") {
+            } else if (expr.value === true) {
                 return [`i32.const 1`];
-            } else if (expr.value === "false") {
+            } else if (expr.value === false) {
                 return [`i32.const 0`];
             } else {
                 return [`i32.const ${expr.value}`];
@@ -144,14 +144,43 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
     }
 }
 
+export function literalToString(lit: LiteralExpr<any>): string {
+    if(lit.value === true) return "True";
+    else if(lit.value === false) return "False";
+    else return String(lit.value);
+}
 
 export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) : Array<string> {
     switch(stmt.tag) {
         case "class": {
             // generate for __init__ function
-            let initFuncStmts = [`(func $${stmt.name}$__init__ (param $self i32) (result i32)`];
+            // if (stmt.methods.some((f)=>f.name === "__init__")) {
+            //     let source = `self = heap\n`;
+            //     source += stmt.fields.map((f, i)=> `self.${f.var.name}=${literalToString((f.value as LiteralExpr<any>))}`).join("\n")
+            //     source += `heap = heap + ${stmt.fields.length * 4}\n`
+            //     const newStmts = parse(source);
+            //     newStmts.forEach((s)=>{if(s.tag==="assign" && s.name.tag==="getfield"){s.name.obj.a=stmt.name}});
+            //     const init_func = stmt.methods.filter(f=>f.name  === "__init__")[0];
+            //     init_func.ret = stmt.name;
+            //     let idx = 0;
+            //     init_func.body.forEach((b, i)=>{if (b.tag === "var") idx = i;});
+            //     init_func.body = [...init_func.body.slice(0, idx+1), ...newStmts, ...init_func.body.slice(idx+1), {tag: "return", value: {tag: "name", name: "self"}}];
+                
+            //     return stmt.methods.map((f) => codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv)).flat();
+            // } else {
+            //     let source = `def __init__(self: ${stmt.name}) -> ${stmt.name}:\n`;
+            //     source += `    self = heap\n`;
+            //     source += stmt.fields.map((f, i)=> `    self.${f.var.name}=${literalToString((f.value as LiteralExpr<any>))}`).join("\n")
+            //     source += `    heap = heap + ${stmt.fields.length * 4}\n`;
+            //     source += `    return self`;
+            //     const newStmts = parse(source);
+            //     newStmts.forEach((s)=>{if(s.tag==="assign" && s.name.tag==="getfield"){s.name.obj.a=stmt.name}});
+            //     return [(newStmts[0] as FuncStmt<any>), ...stmt.methods].map((f) => codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv)).flat();
+            // }
+            // generate for __init__ function
+            let initAllocStmts: string[] = [];
             stmt.fields.map((f, i)=>{
-                initFuncStmts.push(
+                initAllocStmts.push(
                     `global.get $heap`,
                     `i32.const ${i * 4}`,
                     `i32.add`,
@@ -159,27 +188,31 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
                     `i32.store`
                 )
             })
-            initFuncStmts.push(
+            initAllocStmts.push(
                 `global.get $heap`,
                 `global.get $heap`,
                 `i32.const ${stmt.fields.length * 4}`,
                 `i32.add`,
                 `global.set $heap`
             );
+            
+            const initMethod = stmt.methods.filter((f)=>f.name === "__init__");
+            const nonInitMethod = stmt.methods.filter((f)=>f.name !== "__init__");
+            const nonInitMethodStmts = nonInitMethod.map((f) => codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv)).flat();
+            var initMethodStmts:string[] = [];
 
-            let methodsStmts = stmt.methods.map((f) => {
-                let stmts = codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv);
-                if (f.name === "__init__") {
-                    stmts = [...initFuncStmts, `local.set $self`, ...stmts.slice(1), `local.get $self`, ')']
-                }
-                return stmts;
-            }).flat();
-
-            if (stmt.methods.some((f)=>f.name === "__init__")) {
-                return methodsStmts;
+            if (initMethod.length != 0) {
+                initMethodStmts = codeGenStmt({...initMethod[0], name: `${stmt.name}$${initMethod[0].name}`}, locals, classEnv);
+                let idx = 0;
+                initMethodStmts.forEach((s)=>{if(s.includes("local $")) idx += 1;});
+                initMethodStmts = [...initMethodStmts.slice(0, idx+1),  ...initAllocStmts, `local.set $self`, ...initMethodStmts.slice(idx+1,-2), `local.get $self`, ')']
             } else {
-                return [...initFuncStmts, `)`, ...methodsStmts];
+                initMethodStmts = [`(func $${stmt.name}$__init__ (param $self i32) (result i32)`, 
+                        ...initAllocStmts, 
+                        `)`];
             }
+
+            return [...initMethodStmts, ...nonInitMethodStmts];
         }
         case "func": {
             const newLocals = new Set(locals);
@@ -261,7 +294,7 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
                     `br $label_${condLabel}`,`)`,`)`];
         }
         case "pass": {
-            return [`nop`];
+            return [];
         }
         case "return": {
             var valStmts = codeGenExpr(stmt.value, locals, classEnv);

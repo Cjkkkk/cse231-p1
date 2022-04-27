@@ -60,11 +60,11 @@ export function didAllPathReturn(stmts: Stmt<any>[]): boolean {
 export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
     switch(e.tag) {
         case "literal":
-            if( e.value === "none") {
+            if( e.value === "None") {
                 return { ...e, a: "none" };
-            } else if (e.value === "true") {
+            } else if (e.value === true) {
                 return { ...e, a: "bool" }; 
-            } else if (e.value === "false") {
+            } else if (e.value === false) {
                 return { ...e, a: "bool" };
             } else {
                 return { ...e, a: "int" };
@@ -273,8 +273,9 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
             methods.forEach((m)=>{
                 if (m.name === "__init__") {
                     if (m.params.length !== 1 || m.params[0].name !== "self" || m.ret !== "none") {
-                        throw new TypeError("TYPE ERROR: define __init__ with different signature")
+                        throw new TypeError("TYPE ERROR: define __init__ with different signature");
                     }
+                    m.ret = s.name;
                 }
             })
             return {

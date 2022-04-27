@@ -1,6 +1,6 @@
 export enum BinOp {Plus = "PLUS", Minus = "MINUS", Mul = "MUL", Div = "DIV", Mod = "MOD", Equal = "EQUAL", Unequal = "UNEQUAL", Le = "LE", Ge = "GE", Lt = "LT", Gt = "GT", Is = "IS"}
 export enum UniOp {Not = "NOT", Neg = "NEG"}
-export type Literal = "none" | "true" | "false" | number
+export type Literal = "None" | true | false | number
 
 export type Type = "int" | "bool" | "none" | string
 export function isClass(a: Type) {
