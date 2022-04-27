@@ -164,14 +164,13 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
                 `global.get $heap`,
                 `i32.const ${stmt.fields.length * 4}`,
                 `i32.add`,
-                `global.set $heap`,
-                `)`
+                `global.set $heap`
             );
 
             let methodsStmts = stmt.methods.map((f) => {
                 let stmts = codeGenStmt({...f, name: `${stmt.name}$${f.name}`}, locals, classEnv);
                 if (f.name === "__init__") {
-                    stmts = [...initFuncStmts, `local.set $self`, ...stmts.slice(1), `local.get $self`]
+                    stmts = [...initFuncStmts, `local.set $self`, ...stmts.slice(1), `local.get $self`, ')']
                 }
                 return stmts;
             }).flat();
@@ -179,7 +178,7 @@ export function codeGenStmt(stmt: Stmt<Type>, locals: Env, classEnv: ClassEnv) :
             if (stmt.methods.some((f)=>f.name === "__init__")) {
                 return methodsStmts;
             } else {
-                return [...initFuncStmts, ...methodsStmts];
+                return [...initFuncStmts, `)`, ...methodsStmts];
             }
         }
         case "func": {
