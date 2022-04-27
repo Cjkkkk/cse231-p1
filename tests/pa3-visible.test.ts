@@ -235,11 +235,7 @@ print(c2.x)
     n : int = 0
     def __init__(self: C) -> C:
       self.n = 1`)
-  assertTCFail("init-gets-called",`
-  class C(object):
-    n : int = 0
-    def __init__(self: C):
-      self.n = 1`)
+
   assertTCFail("expr-not-ret-type",`
   class C(object):
     def f(self: C) -> int:

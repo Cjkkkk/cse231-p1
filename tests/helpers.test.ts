@@ -10,7 +10,7 @@ export function typeCheck(source: string) : Type {
     const stmts = parse(source);
     const newStmts = tcProgram(stmts);
     const lastStmt = newStmts[newStmts.length - 1];
-    if (lastStmt.tag != "expr") {
+    if (lastStmt.tag !== "expr") {
         return "none"
     }
     const lastType = (lastStmt as ExprStmt<any>).expr.a;

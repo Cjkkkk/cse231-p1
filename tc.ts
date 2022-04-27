@@ -96,9 +96,8 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "bool", lhs, rhs };
-                case BinOp.Is: 
-                    // todo: fix this
-                    if (lhs.a === "int" || rhs.a == "int" || lhs.a === "bool" || rhs.a === "bool" ) {
+                case BinOp.Is:
+                    if (lhs.a === "int" || rhs.a === "int" || lhs.a === "bool" || rhs.a === "bool" ) {
                         throw new TypeError(`TYPE ERROR: Expected type NONE or CLASS but got type ${lhs.a} and type ${rhs.a}`)
                     }
                     return { ...e, a: "bool", lhs, rhs };
@@ -109,12 +108,12 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             const expr = tcExpr(e.expr, envList);
             switch(e.op) {
                 case UniOp.Not: 
-                    if (expr.a != "bool") {
+                    if (expr.a !== "bool") {
                         throw new TypeError(`TYPE ERROR: Expected type BOOL but got type ${expr.a}`)
                     }
                     return { ...e, a: "bool", expr: expr };
                 case UniOp.Neg: 
-                    if (expr.a != "int") {
+                    if (expr.a !== "int") {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${expr.a}`)
                     }
                     return { ...e, a: "int", expr: expr };
@@ -125,7 +124,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             if (!found) {
                 throw new ReferenceError(`Reference error: ${e.name} is not defined`)
             } 
-            if (t.tag != "var") {
+            if (t.tag !== "var") {
                 throw new ReferenceError(`Reference error: ${e.name} is not a variable`)
             }
             return { ...e, a: t.type};
@@ -246,7 +245,7 @@ export function tcFuncStmt(s : FuncStmt<any>, envList: SymbolTableList, currentR
 
 export function tcVarStmt(s : VarStmt<any>, envList: SymbolTableList, currentReturn : Type) : VarStmt<Type> {
     const rhs = tcExpr(s.value, envList);
-    if ( rhs.tag != "literal") {
+    if ( rhs.tag !== "literal") {
         throw new Error(`can only initialize variable with literal`);
     }
     if (!isAssignable(s.var.type, rhs.a)) {
@@ -303,7 +302,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
         case "if": {
             const newIfCond = tcExpr(s.if.cond, envList);
-            if(newIfCond.a != "bool") {
+            if(newIfCond.a !== "bool") {
                 throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
@@ -315,7 +314,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
             const newElif = s.elif.map(bs => {
                 let cond = tcExpr(bs.cond, envList);
-                if(cond.a != "bool") {
+                if(cond.a !== "bool") {
                     throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
                 }
                 // functions = enterNewFunctionScope(functions);
@@ -343,7 +342,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
         case "while": {
             const newCond = tcExpr(s.while.cond, envList);
-            if(newCond.a != "bool") {
+            if(newCond.a !== "bool") {
                 throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);

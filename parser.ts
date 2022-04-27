@@ -1,7 +1,7 @@
 import { assert } from "chai";
 import { parser } from "lezer-python";
 import { TreeCursor } from "lezer-tree";
-import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody, FuncStmt, VarStmt, isClass, NameExpr} from "./ast";
+import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody, FuncStmt, VarStmt, isClass, NameExpr, LiteralExpr} from "./ast";
 
 
 export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
@@ -364,7 +364,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             var maybeRet = c.nextSibling();
             var dummyC = c;
             var returnExpr: Expr<any> = {tag: "literal", value: "None"};
-            if (maybeRet && dummyC.node.type.name != "⚠") {
+            if (maybeRet && dummyC.node.type.name !== "⚠") {
                 returnExpr = traverseExpr(c, s);
             }
             c.parent();
