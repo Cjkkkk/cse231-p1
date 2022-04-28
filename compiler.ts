@@ -108,7 +108,7 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
             
             let toCall = expr.name;
             if (expr.name === "print") {
-                switch(expr.args[0].a) {
+                switch(expr.args[0].a.tag) {
                     case "bool": toCall = "print_bool"; break;
                     case "int": toCall = "print_num"; break;
                     case "none": toCall = "print_none"; break;
@@ -128,7 +128,7 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
             return [
                 ...objStmts, // self
                 ...argsStmts,
-                `call $${expr.obj.a}$${expr.name}`
+                `call $${(expr.obj.a as {tag: "class", name: string}).name}$${expr.name}`
             ];
         }
 
@@ -136,7 +136,7 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, classEnv: ClassEnv) 
             const ObjStmt = codeGenExpr(expr.obj, locals, classEnv);
             return [
                 ...ObjStmt,
-                `i32.const ${classEnv.get(expr.obj.a).get(expr.name)}`,
+                `i32.const ${classEnv.get((expr.obj.a as {tag: "class", name: string}).name).get(expr.name)}`,
                 `i32.add`,
                 `i32.load`
             ]
@@ -352,7 +352,7 @@ export function compile(source : string) : string {
     const classEnv = new Map<string, Map<string, number>>();
 
     classes.forEach((c) => {
-        calculateOffset(classEnv, (c as ClassStmt<string>));
+        calculateOffset(classEnv, (c as ClassStmt<any>));
     });
 
     const classCode = classes.map(f => addIndent(codeGenStmt(f, locals, classEnv), 1)).map(f=> f.join("\n")).join("\n\n");

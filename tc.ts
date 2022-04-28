@@ -1,6 +1,6 @@
 
 import { assert } from "chai";
-import { BinOp, Expr, Stmt, Type, UniOp, TypeDef, FuncStmt, VarStmt, isClass } from "./ast";
+import { BinOp, Expr, Stmt, Type, UniOp, FuncStmt, VarStmt, isClass, isAssignable, isTypeEqual } from "./ast";
 type VarSymbol = {tag: "var", type: Type}
 type FuncSymbol = {tag: "func", type: [Type[], Type]}
 type ClassSymbol = {tag: "class", type: {methods: Map<string, [Type[], Type]>, fields: Map<string, Type>}}
@@ -9,10 +9,6 @@ type SymbolTable = Map<string, UnionSymbol>
 type SymbolTableList = SymbolTable[];
 
 
-
-function isAssignable(lhs: Type, rhs: Type): boolean {
-    return lhs === rhs || (isClass(lhs) && rhs === "none")
-}
 
 function getCurrentEnv(envList : SymbolTableList): SymbolTable {
     assert(envList.length > 0);
@@ -61,13 +57,13 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
     switch(e.tag) {
         case "literal":
             if( e.value === "None") {
-                return { ...e, a: "none" };
+                return { ...e, a: {tag: "none"}};
             } else if (e.value === true) {
-                return { ...e, a: "bool" }; 
+                return { ...e, a: {tag: "bool"}}; 
             } else if (e.value === false) {
-                return { ...e, a: "bool" };
+                return { ...e, a: {tag: "bool"}};
             } else {
-                return { ...e, a: "int" };
+                return { ...e, a: {tag: "int"}};
             }
         case "binary": {
             const lhs = tcExpr(e.lhs, envList);
@@ -78,29 +74,29 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 case BinOp.Mul:
                 case BinOp.Div: 
                 case BinOp.Mod:
-                    if (lhs.a !== "int" || rhs.a !== "int") {
+                    if (lhs.a.tag !== "int" || rhs.a.tag !== "int") {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: "int", lhs, rhs};
+                    return { ...e, a: {tag: "int"}, lhs, rhs};
                 case BinOp.Equal:
                 case BinOp.Unequal:
-                    if (lhs.a !== rhs.a || (lhs.a !== "int" && lhs.a !== "bool")) {
+                    if (!isTypeEqual(lhs.a, rhs.a) || (lhs.a.tag !== "int" && lhs.a.tag !== "bool")) {
                         throw new TypeError(`TYPE ERROR: Expected lhs and rhs to be same type of INT or BOOL but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: "bool", lhs, rhs};
+                    return { ...e, a: {tag: "bool"}, lhs, rhs};
                 case BinOp.Gt: 
                 case BinOp.Ge:
                 case BinOp.Lt:
                 case BinOp.Le:
-                    if (lhs.a !== "int" || rhs.a !== "int") {
+                    if (lhs.a.tag !== "int" || rhs.a.tag !== "int") {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: "bool", lhs, rhs };
+                    return { ...e, a: {tag: "bool"}, lhs, rhs };
                 case BinOp.Is:
-                    if (lhs.a === "int" || rhs.a === "int" || lhs.a === "bool" || rhs.a === "bool" ) {
+                    if (lhs.a.tag === "int" || rhs.a.tag === "int" || lhs.a.tag === "bool" || rhs.a.tag === "bool" ) {
                         throw new TypeError(`TYPE ERROR: Expected type NONE or CLASS but got type ${lhs.a} and type ${rhs.a}`)
                     }
-                    return { ...e, a: "bool", lhs, rhs };
+                    return { ...e, a: {tag: "bool"}, lhs, rhs };
             }
         }
 
@@ -108,15 +104,15 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             const expr = tcExpr(e.expr, envList);
             switch(e.op) {
                 case UniOp.Not: 
-                    if (expr.a !== "bool") {
+                    if (expr.a.tag !== "bool") {
                         throw new TypeError(`TYPE ERROR: Expected type BOOL but got type ${expr.a}`)
                     }
-                    return { ...e, a: "bool", expr: expr };
+                    return { ...e, a: {tag: "bool"}, expr: expr };
                 case UniOp.Neg: 
-                    if (expr.a !== "int") {
+                    if (expr.a.tag !== "int") {
                         throw new TypeError(`TYPE ERROR: Expected type INT but got type ${expr.a}`)
                     }
-                    return { ...e, a: "int", expr: expr };
+                    return { ...e, a: {tag: "int"}, expr: expr };
             }
         }
         case "name": {
@@ -133,7 +129,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             if(e.name === "print") {
                 if(e.args.length !== 1) { throw new Error("print expects a single argument"); }
                 const newArgs = [tcExpr(e.args[0], envList)];
-                const res : Expr<Type> = { ...e, a: "none", args: newArgs } ;
+                const res : Expr<Type> = { ...e, a: {tag: "none"}, args: newArgs } ;
                 return res;
             }
 
@@ -161,18 +157,18 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 if(0 !== e.args.length) {
                     throw new Error(`Expected ${0} arguments but got ${e.args.length}`);
                 }
-                return { ...e, a: e.name };
+                return { ...e, a: {tag: "class", name: e.name} };
             } else {
                 throw new ReferenceError(`${e.name} is not a function or class`);
             }
         }
         case "getfield": {
             const newObj = tcExpr(e.obj, envList);
-            if (!isClass(newObj.a)) {
+            if (newObj.a.tag !== "class") {
                 throw new Error("can not get member of non-class")
-            }
+            } 
             let className = newObj.a;
-            let [found, t] = lookUpSymbol(envList, className, false);
+            let [found, t] = lookUpSymbol(envList, className.name, false);
             if(!found) {
                 throw new ReferenceError(`class ${className} is not defined`);
             }
@@ -188,11 +184,11 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
         }
         case "method": {
             const newObj = tcExpr(e.obj, envList);
-            if (!isClass(newObj.a)) {
+            if (newObj.a.tag !== "class") {
                 throw new Error("can not call method on non-class")
             }
             let className = newObj.a;
-            let [found, t] = lookUpSymbol(envList, className, false);
+            let [found, t] = lookUpSymbol(envList, className.name, false);
             if(!found) {
                 throw new ReferenceError(`class ${className} is not defined`);
             }
@@ -221,7 +217,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
 }
 
 export function tcFuncStmt(s : FuncStmt<any>, envList: SymbolTableList, currentReturn : Type) : FuncStmt<Type> {
-    if (s.ret !== "none" && !didAllPathReturn(s.body)) {
+    if (s.ret.tag !== "none" && !didAllPathReturn(s.body)) {
         throw new TypeError(`TYPE ERROR: All path in function ${s.name} must have a return statement`);
     }
     envList = enterNewEnv(envList);
@@ -271,10 +267,10 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
             const methods = s.methods.map((v)=>tcFuncStmt(v, envList, currentReturn));
             methods.forEach((m)=>{
                 if (m.name === "__init__") {
-                    if (m.params.length !== 1 || m.params[0].name !== "self" || m.ret !== "none") {
+                    if (m.params.length !== 1 || m.params[0].name !== "self" || m.ret.tag !== "none") {
                         throw new TypeError("TYPE ERROR: define __init__ with different signature");
                     }
-                    m.ret = s.name;
+                    m.ret = {tag: "class", name: s.name};
                 }
             })
             return {
@@ -302,7 +298,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
         case "if": {
             const newIfCond = tcExpr(s.if.cond, envList);
-            if(newIfCond.a !== "bool") {
+            if(newIfCond.a.tag !== "bool") {
                 throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
@@ -314,7 +310,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
             const newElif = s.elif.map(bs => {
                 let cond = tcExpr(bs.cond, envList);
-                if(cond.a !== "bool") {
+                if(cond.a.tag !== "bool") {
                     throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
                 }
                 // functions = enterNewFunctionScope(functions);
@@ -342,7 +338,7 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
         case "while": {
             const newCond = tcExpr(s.while.cond, envList);
-            if(newCond.a !== "bool") {
+            if(newCond.a.tag !== "bool") {
                 throw new TypeError("TYPE ERROR: Expect type BOOL in condition")
             }
             // functions = enterNewFunctionScope(functions);
@@ -419,7 +415,7 @@ export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
     })
 
     return p.map(s => {
-        const res = tcStmt(s, envList, "none");
+        const res = tcStmt(s, envList, {tag: "none"});
         return res;
     });
 }

@@ -180,6 +180,19 @@ class C(object):
             return 0
         else:
             return`
+
+
+source = `
+def f(a:int) -> Callable[[int], int]:
+    pass
+
+def f1(a:List[int]) -> Callable[[int], int]:
+    pass
+
+
+def f2(a:Tuple[int, int]) -> Callable[[int], Callable[[int], int]]:
+    pass
+`
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
 

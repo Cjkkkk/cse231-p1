@@ -14,9 +14,10 @@ export function typeCheck(source: string) : Type {
         return "none"
     }
     const lastType = (lastStmt as ExprStmt<any>).expr.a;
-    if (lastType === "int" || lastType === "bool" || lastType === "none") return lastType;
+    if (lastType.tag === "int" || lastType.tag === "bool" || lastType.tag === "none") return lastType.tag;
+    else if (lastType.tag === "class") return CLASS(lastType.name);
     else {
-        return {tag: "object", class: lastType};
+        return "none";
     }
 }
 

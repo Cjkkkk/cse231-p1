@@ -2,9 +2,40 @@ export enum BinOp {Plus = "PLUS", Minus = "MINUS", Mul = "MUL", Div = "DIV", Mod
 export enum UniOp {Not = "NOT", Neg = "NEG"}
 export type Literal = "None" | true | false | number
 
-export type Type = "int" | "bool" | "none" | string
+export const INT = { tag: "int"} 
+export const BOOL = {tag: "bool"} 
+export const NONE = {tag: "none"} 
+
+export type Type = 
+    { tag: "int"} 
+    | {tag: "bool"} 
+    | {tag: "none"} 
+    | {tag: "class", name: string} 
+    | {tag: "callable", params: Type[], ret: Type}
+    | {tag: "list", type: Type}
+    | {tag: "tuple", members: Type[]}
+
+export function isTypeEqual(lhs: Type, rhs: Type): boolean {
+    if (lhs.tag !== rhs.tag) return false;
+    else if (lhs.tag === "int" || lhs.tag === "bool" || lhs.tag === "none") return true;
+    else if (lhs.tag === "class" && rhs.tag === "class") return lhs.name === rhs.name;
+    else if (lhs.tag === "callable" && rhs.tag === "callable") {
+        if (lhs.params.length != rhs.params.length) return false;
+        lhs.params.forEach((t, i) => {
+            if (!isTypeEqual(t, rhs.params[i])) return false;
+        })
+        return isTypeEqual(lhs.ret, rhs.ret);
+    } else {
+        throw new TypeError("TYPE ERROR: Do not support this type")
+    }
+}
+
+export function isAssignable(lhs: Type, rhs: Type): boolean {
+    return isTypeEqual(lhs, rhs) || (isClass(lhs) && isTypeEqual(rhs, {tag: "none"}))
+}
+
 export function isClass(a: Type) {
-    return a !== "int" && a !== "bool" && a !== "none"
+    return a.tag === "class"
 }
 
 export type TypeDef = {name: string, type: Type}

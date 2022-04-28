@@ -1,42 +1,109 @@
-import * as mocha from 'mocha';
-import {expect} from 'chai';
-import { parser } from 'lezer-python';
-import { traverseExpr, traverseStmt, traverse, parse } from '../parser';
+import { expect } from 'chai';
+import { parse } from '../parser';
 
 // We write tests for each function in parser.ts here. Each function gets its 
 // own describe statement. Each it statement represents a single test. You
 // should write enough unit tests for each function until you are confident
 // the parser works as expected. 
-describe('traverseExpr(c, s) function', () => {
-    it('parses a number in the beginning', () => {
+describe('parse literal', () => {
+    it('1', () => {
         const source = "987";
-        const cursor = parser.parse(source).cursor();
-
-        // go to statement
-        cursor.firstChild();
-        // go to expression
-        cursor.firstChild();
-
-        const parsedExpr = traverseExpr(cursor, source);
-
+        const stmts = parse(source);
         // Note: we have to use deep equality when comparing objects
-        expect(parsedExpr).to.deep.equal({tag: "literal", value: 987});
+        expect(stmts[0]).to.deep.equal({tag: "expr", expr: {tag: "literal", value: 987}});
     })
 
     // TODO: add additional tests here to ensure traverseExpr works as expected
 });
 
-describe('traverseStmt(c, s) function', () => {
+describe('parse assignment', () => {
     // TODO: add tests here to ensure traverseStmt works as expected
-    it('parses a assignment in the beginning', () => {
+    it('1', () => {
         const source = "a = 1";
-        const cursor = parser.parse(source).cursor();
+        const stmts = parse(source);
+        // Note: we have to use deep equality when comparing objects
+        expect(stmts[0]).to.deep.equal({ tag: "assign", name: {name: "a", tag: "name"}, value: {tag: "literal", value:1 }});
+    })
+});
 
-        // go to statement
-        cursor.firstChild();
-        const parsedStmt = traverseStmt(cursor, source);
+
+describe('parses type', () => {
+    it('1', () => {
+        const source = "def f(a:int) -> Callable[[int], int]:\n    pass";
+        const stmts = parse(source);
 
         // Note: we have to use deep equality when comparing objects
-        expect(parsedStmt).to.deep.equal({ tag: "assign", name: {name: "a", tag: "name"}, value: {tag: "literal", value:1 }});
+        expect(stmts[0]).to.deep.equal({
+            tag: "func", 
+            name: "f", 
+            params: [{name: "a", type: {tag: "int"}}], 
+            ret: {
+                tag: "callable", 
+                params: [{tag: "int"}],
+                ret: {tag: "int"}
+            }, 
+            body: [{tag: "pass"}]});
     })
+
+    it('2', () => {
+        const source = "def f1(a:List[int]) -> Callable[[int], int]:\n    pass";
+        const stmts = parse(source);
+
+        // Note: we have to use deep equality when comparing objects
+        expect(stmts[0]).to.deep.equal({
+            tag: "func", 
+            name: "f1", 
+            params: [
+                {
+                    name: "a", 
+                    type: {
+                        tag: "list",
+                        type: {tag: "int"}
+                    }
+                }
+            ], 
+            ret: {
+                tag: "callable", 
+                params: [
+                    {tag: "int"}
+                ],
+                ret: {tag: "int"}
+            }, 
+            body: [{tag: "pass"}]});
+    })
+
+    it('3', () => {
+        const source = "def f2(a:Tuple[int, int]) -> Callable[[int], Callable[[int], int]]:\n    pass";
+        const stmts = parse(source);
+
+        // Note: we have to use deep equality when comparing objects
+        expect(stmts[0]).to.deep.equal({
+            tag: "func", 
+            name: "f2", 
+            params: [
+                {
+                    name: "a", 
+                    type: {
+                        tag: "tuple", 
+                        members: [
+                            {tag: "int"}, 
+                            {tag: "int"}
+                        ]
+                    }
+                }
+            ], 
+            ret: {
+                tag: "callable", 
+                params: [
+                    {tag: "int"}
+                ],
+                ret: {
+                    tag: "callable",
+                    params: [{tag: "int"}],
+                    ret: {tag: "int"}
+                }
+            }, 
+            body: [{tag: "pass"}]});
+    })
+    // TODO: add additional tests here to ensure traverseExpr works as expected
 });

@@ -1,7 +1,7 @@
 import { assert } from "chai";
 import { parser } from "lezer-python";
 import { TreeCursor } from "lezer-tree";
-import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody, FuncStmt, VarStmt, isClass, NameExpr, LiteralExpr} from "./ast";
+import { BinOp, Expr, Stmt, UniOp, Type, TypeDef, CondBody, FuncStmt, VarStmt, isClass, NameExpr} from "./ast";
 
 
 export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
@@ -19,23 +19,82 @@ export function traverseArgs(c : TreeCursor, s : string) : Array<Expr<any>> {
     return args;
 }
 
+
+export function traverseTypeDef(c : TreeCursor, s : string): Type {
+    var originName = c.node.type.name;
+    var type: Type = undefined;
+    c.firstChild();  // Enter TypeDef: 
+    c.nextSibling(); // Focuses on type itself
+    type = traverseType(c, s);
+    c.parent();
+    assert(c.node.type.name === originName);
+    return type;
+}
 export function traverseType(c : TreeCursor, s : string): Type {
     var originName = c.node.type.name;
     var type: Type = undefined;
-    c.firstChild();  // Enter TypeDef
-    c.nextSibling(); // Focuses on type itself
     switch(c.type.name) {
         case "VariableName": {
-            type = s.substring(c.from, c.to);
+            const name = s.substring(c.from, c.to);
+            if (name === "int") type = {tag: "int"};
+            else if (name === "bool") type = {tag: "bool"};
+            else if (name === "none") type = {tag: "none"};
+            else {
+                type = {tag: "class", name};
+            }
+            break;
+        }
+        case "MemberExpression": {
+            c.firstChild();
+            const name = s.substring(c.from, c.to);
+            if (name === "Callable") {
+                c.nextSibling(); // [
+                c.nextSibling(); // ArrayExpression
+                c.firstChild(); //  [
+                const params = traverseArray(c, s);
+                c.parent();
+                c.nextSibling(); // comma
+                c.nextSibling(); // ret
+                const ret = traverseType(c, s);
+                c.nextSibling(); // ]
+                type = {tag: "callable", params, ret};
+            } else if (name === "List"){
+                c.nextSibling(); // [
+                const members = traverseArray(c, s);
+                assert(members.length === 1)
+                type = {tag: "list", type: members[0]}; 
+            } else if (name === "Tuple"){
+                c.nextSibling(); // [
+                const members = traverseArray(c, s);
+                type = {tag: "tuple", members};
+            }
+            else {
+                throw new Error("PARSE ERROR: Do not support this type now: " + name);
+            }
+            c.parent();
             break;
         }
         default:
             throw new Error("Unknown type: " + c.type.name);
     }
-    c.parent();
     assert(c.node.type.name === originName);
     return type;
 }
+
+
+export function traverseArray(c : TreeCursor, s : string) : Array<Type> {
+    // for [type...]
+    const types: Type[] = [];
+    c.nextSibling(); // Focuses on a type
+    while(c.type.name !== "]") {
+        var type = traverseType(c, s);
+        c.nextSibling(); // Move on to comma or "]"
+        types.push(type);
+        c.nextSibling(); // Focuses on a type
+    }
+    return types;
+}
+
 
 export function traverseParameters(c : TreeCursor, s : string) : Array<TypeDef> {
     var originName = c.node.type.name;
@@ -49,7 +108,7 @@ export function traverseParameters(c : TreeCursor, s : string) : Array<TypeDef> 
         if(nextTagName !== "TypeDef") { 
             throw new Error("Missed type annotation for parameter " + name)
         };
-        var type = traverseType(c, s);
+        var type = traverseTypeDef(c, s);
         c.nextSibling(); // Move on to comma or ")"
         parameters.push({name, type});
         c.nextSibling(); // Focuses on a VariableName
@@ -206,6 +265,10 @@ export function traverseExpr(c : TreeCursor, s : string) : Expr<any> {
                 obj,
                 name
             }
+
+        // case "ArrayExpression":
+        //     c.firstChild();
+        //     c.nextSibling()
         default:
             throw new Error("Could not parse expr at " + c.type.name + c.from + " " + c.to + ": " + s.substring(c.from, c.to));
     }
@@ -235,7 +298,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.firstChild(); // class
             c.nextSibling();
             const name = s.substring(c.from, c.to); // class name
-            if (!isClass(name)) {
+            if (name === "int" || name === "bool" || name === "none") {
                 throw new Error(`can not define class with name: ${name}`)
             }
             c.nextSibling(); 
@@ -269,7 +332,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // go to equals or typedef
             var type : Type = undefined;
             if (c.type.name === "TypeDef") {
-                type = traverseType(c, s);
+                type = traverseTypeDef(c, s);
                 c.nextSibling(); // go to equals
             }
             c.nextSibling(); // go to value
@@ -299,10 +362,10 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             c.nextSibling(); // Focus on ParamList
             var params = traverseParameters(c, s)
             c.nextSibling(); // Focus on Body or TypeDef
-            var ret : Type = "none";
+            var ret : Type = {tag: "none"};
             var maybeTD = c;
             if(maybeTD.type.name === "TypeDef") {
-                ret = traverseType(c, s);
+                ret = traverseTypeDef(c, s);
             }
             c.nextSibling(); // body
             const body = traverseBody(c, s);
