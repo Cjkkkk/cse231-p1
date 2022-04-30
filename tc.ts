@@ -1,6 +1,7 @@
 
 import { assert } from "chai";
 import { BinOp, Expr, Stmt, Type, UniOp, FuncStmt, VarStmt, isAssignable, isTypeEqual, typeStr } from "./ast";
+
 type VarSymbol = {tag: "var", type: Type}
 type FuncSymbol = {tag: "func", type: [Type[], Type]}
 type ClassSymbol = {tag: "class", type: {super: string, methods: Map<string, [Type[], Type]>, fields: Map<string, Type>}}
@@ -300,6 +301,12 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
                     if (m.params.length !== 1 || m.params[0].name !== "self" || m.ret.tag !== "none") {
                         throw new TypeError("TYPE ERROR: define __init__ with different signature");
                     }
+                    // Change its return type here so it does not break the type check rule
+                    // class A(object):
+                    //     def __init__(self: A):
+                    //         pass
+                    // a: A = None
+                    // a = A() # break here since A() calls __init__ which does not return anything
                     m.ret = {tag: "class", name: s.name};
                 }
             })

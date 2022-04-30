@@ -21,36 +21,30 @@ def f(a:int, d: int) -> Callable[[int, int], int]:
 
 ```python
 # generate following
-def f(a:int, d: int) -> callable_int_int_int:
+def f(a:int, d: int) -> Closure:
     if a > 0:
-        return callable_int_int_int().new(f.f1, f.f1.closure().new(a, d)))
+        f1: f_f1_closure = None
+        f1.a = a
+        f1.d = d
+        return f1
     else:
-        return callable_int_int_int().new(f.f2, f.f2.closure().new(a)))
+        f2: f_f2_closure = None
+        f2.a = a
+        return f2
 
-def f.f1(b: int, c: int, closure: f1_closure) -> int:
-    return closure.a + b + c
+class callable_int_int_int_closure(object): 
+    def apply(self: callable_int_int_int_closure, b: int, c: int) -> int:
+        pass
 
-def f.f2(b: int, c: int, closure: f2_closure) -> int:
-    return closure.a + b - c
 
-class f.f1.closure(object):
+class f_f1_closure(callable_int_int_int_closure):
     a: int = 0
     d: int = 0
-    def new(self, a: int, d: int):
-        self.a = a
-        self.d = d
+    def apply(self: f_f1_closure, b: int, c: int) -> int:
+        return self.a + b + c + self.d
 
-class f.f2.closure(object):
+class f_f2_closure(callable_int_int_int_closure):
     a: int = 0
-    def new(self, a):
-        self.a = a
-
-class callable_int_int_int(object):
-    closure: Any = None
-    func_pointer: Int = 0
-    def new(self, c, f):
-        self.closure = c
-        self.func_pointer = f
-    def __call__(self, a: int, b: int) -> int:
-        return self.func_pointer(a, b, self.closure)
+    def apply(self: f_f2_closure, b: int, c: int) -> int:
+        return self.a + b - c
 ```
