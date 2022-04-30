@@ -305,6 +305,10 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             // inheritance
             // ignore it for now
             const args = traverseArgs(c, s);
+            if (args.length !== 1) {
+                throw new Error(`Only support one super class but got ${args.length}`);
+            }
+
             c.nextSibling(); // body
             const body = traverseBody(c, s);
             const fields: VarStmt<any>[] = [];
@@ -321,6 +325,7 @@ export function traverseStmt(c : TreeCursor, s : string) : Stmt<any> {
             assert(c.node.type.name === originName);
             return {
                 tag: "class",
+                super: (args[0] as NameExpr<any>).name,
                 name,
                 methods,
                 fields

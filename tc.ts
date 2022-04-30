@@ -1,13 +1,25 @@
 
 import { assert } from "chai";
-import { BinOp, Expr, Stmt, Type, UniOp, FuncStmt, VarStmt, isClass, isAssignable, isTypeEqual } from "./ast";
+import { BinOp, Expr, Stmt, Type, UniOp, FuncStmt, VarStmt, isAssignable, isTypeEqual, typeStr } from "./ast";
 type VarSymbol = {tag: "var", type: Type}
 type FuncSymbol = {tag: "func", type: [Type[], Type]}
-type ClassSymbol = {tag: "class", type: {methods: Map<string, [Type[], Type]>, fields: Map<string, Type>}}
+type ClassSymbol = {tag: "class", type: {super: string, methods: Map<string, [Type[], Type]>, fields: Map<string, Type>}}
 type UnionSymbol = VarSymbol | FuncSymbol | ClassSymbol
 type SymbolTable = Map<string, UnionSymbol>
 type SymbolTableList = SymbolTable[];
 
+
+function isSubClass(sub: Type, sup: Type, envList : SymbolTableList): boolean {
+    if (sub.tag !== "class" || sup.tag !== "class") return false;
+    else {
+        const [_, symbolSub] = lookUpSymbol(envList, sub.name, false);
+        if (symbolSub.tag !== "class" || symbolSub.type.super === "object") return false;
+        else if (symbolSub.type.super === sup.name) return true;
+        else {
+            return isSubClass( {tag: "class", name: symbolSub.type.super} , sup, envList);
+        }
+    }
+}
 
 
 function getCurrentEnv(envList : SymbolTableList): SymbolTable {
@@ -75,13 +87,13 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 case BinOp.Div: 
                 case BinOp.Mod:
                     if (lhs.a.tag !== "int" || rhs.a.tag !== "int") {
-                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${typeStr(lhs.a)} and type ${typeStr(rhs.a)}`)
                     }
                     return { ...e, a: {tag: "int"}, lhs, rhs};
                 case BinOp.Equal:
                 case BinOp.Unequal:
                     if (!isTypeEqual(lhs.a, rhs.a) || (lhs.a.tag !== "int" && lhs.a.tag !== "bool")) {
-                        throw new TypeError(`TYPE ERROR: Expected lhs and rhs to be same type of INT or BOOL but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected lhs and rhs to be same type of INT or BOOL but got type ${typeStr(lhs.a)} and type ${typeStr(rhs.a)}`)
                     }
                     return { ...e, a: {tag: "bool"}, lhs, rhs};
                 case BinOp.Gt: 
@@ -89,12 +101,12 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 case BinOp.Lt:
                 case BinOp.Le:
                     if (lhs.a.tag !== "int" || rhs.a.tag !== "int") {
-                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${typeStr(lhs.a)} and type ${typeStr(rhs.a)}`)
                     }
                     return { ...e, a: {tag: "bool"}, lhs, rhs };
                 case BinOp.Is:
                     if (lhs.a.tag === "int" || rhs.a.tag === "int" || lhs.a.tag === "bool" || rhs.a.tag === "bool" ) {
-                        throw new TypeError(`TYPE ERROR: Expected type NONE or CLASS but got type ${lhs.a} and type ${rhs.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type NONE or CLASS but got type ${typeStr(lhs.a)} and type ${typeStr(rhs.a)}`)
                     }
                     return { ...e, a: {tag: "bool"}, lhs, rhs };
             }
@@ -105,12 +117,12 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             switch(e.op) {
                 case UniOp.Not: 
                     if (expr.a.tag !== "bool") {
-                        throw new TypeError(`TYPE ERROR: Expected type BOOL but got type ${expr.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type BOOL but got type ${typeStr(expr.a)}`)
                     }
                     return { ...e, a: {tag: "bool"}, expr: expr };
                 case UniOp.Neg: 
                     if (expr.a.tag !== "int") {
-                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${expr.a}`)
+                        throw new TypeError(`TYPE ERROR: Expected type INT but got type ${typeStr(expr.a)}`)
                     }
                     return { ...e, a: {tag: "int"}, expr: expr };
             }
@@ -138,15 +150,22 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 throw new ReferenceError(`function ${e.name} is not defined`);
             }
             
-            if(t.tag === "func") {
-                const [args, ret] = t.type;
+            if(t.tag === "func" || t.tag === "var" && t.type.tag === "callable") {
+                let args: Type[];
+                let ret: Type;
+                if (t.tag === "func") {
+                    [args, ret] = t.type;
+                } else {
+                    const callableType = (t.type as {tag: "callable", params: Type[], ret: Type});
+                    [args, ret] = [callableType.params, callableType.ret];
+                }
                 if(args.length !== e.args.length) {
                     throw new Error(`Expected ${args.length} arguments but got ${e.args.length}`);
                 }
 
                 const newArgs = args.map((a, i) => {
                     const argtyp = tcExpr(e.args[i], envList);
-                    if(!isAssignable(a, argtyp.a)) { throw new TypeError(`TYPE ERROR: Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
+                    if(!isAssignable(a, argtyp.a) && !isSubClass(argtyp.a, a, envList)) { throw new TypeError(`TYPE ERROR: Got ${typeStr(argtyp.a)} as argument ${i + 1}, expected ${typeStr(a)}`); }
                     return argtyp
                 });
 
@@ -159,7 +178,7 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 }
                 return { ...e, a: {tag: "class", name: e.name} };
             } else {
-                throw new ReferenceError(`${e.name} is not a function or class`);
+                throw new ReferenceError(`${e.name} is not a function or class or callable`);
             }
         }
         case "getfield": {
@@ -196,19 +215,30 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
                 throw new ReferenceError(`${className} is not a class name`);
             }
             let classData = t.type;
-            if (!classData.methods.has(e.name)) {
-                throw new ReferenceError(`class ${className} does not have method ${e.name}`)
-            } 
-            
-            const [args, ret] = classData.methods.get(e.name);
-            if(args.length !== e.args.length + 1) {
+        
+            // should be able to function pointers too
+            let args: Type[];
+            let ret: Type;
+            let isClassMethod: number;
+            if (classData.methods.has(e.name)) {
+                isClassMethod = 1;
+                [args, ret] = classData.methods.get(e.name);
+            } else if(classData.fields.has(e.name) && classData.fields.get(e.name).tag === "callable"){
+                isClassMethod = 0;
+                const callableType = (classData.fields.get(e.name) as {tag: "callable", params: Type[], ret: Type});
+                [args, ret] = [callableType.params, callableType.ret];
+            } else {
+                throw new ReferenceError(`class ${className} does not have method ${e.name} or callable field ${e.name}`)
+            }
+
+            if(args.length !== e.args.length + isClassMethod) {
                 throw new Error(`Expected ${args.length} arguments but got ${e.args.length + 1}`);
             }
             
             // exclude self
-            const newArgs = args.slice(1).map((a, i) => {
+            const newArgs = args.slice(isClassMethod).map((a, i) => {
                 const argtyp = tcExpr(e.args[i], envList);
-                if(!isAssignable(a, argtyp.a)) { throw new TypeError(`TYPE ERROR: Got ${argtyp.a} as argument ${i + 1}, expected ${a}`); }
+                if(!isAssignable(a, argtyp.a) && !isSubClass(argtyp.a, a, envList)) { throw new TypeError(`TYPE ERROR: Got ${typeStr(argtyp.a)} as argument ${i + isClassMethod}, expected ${typeStr(a)}`); }
                 return argtyp;
             });
             return { ...e, a: ret, obj: newObj, args: newArgs };
@@ -245,7 +275,7 @@ export function tcVarStmt(s : VarStmt<any>, envList: SymbolTableList, currentRet
         throw new Error(`can only initialize variable with literal`);
     }
     if (!isAssignable(s.var.type, rhs.a)) {
-        throw new TypeError(`TYPE ERROR: Incompatible type when initializing variable ${s.var.name} of type ${s.var.type} using type ${rhs.a}`)
+        throw new TypeError(`TYPE ERROR: Incompatible type when initializing variable ${s.var.name} of type ${typeStr(s.var.type)} using type ${typeStr(rhs.a)}`)
     }
     return { ...s, value: rhs };
 }
@@ -289,8 +319,8 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
                     throw new ReferenceError(`Reference error: ${lhs.name} is not defined`);
                 }
             }
-            if( !isAssignable(lhs.a, rhs.a)) {
-                throw new TypeError(`TYPE ERROR: Cannot assign ${rhs.a} to ${lhs.a}`);
+            if( !isAssignable(lhs.a, rhs.a) && !isSubClass(rhs.a, lhs.a, envList)) {
+                throw new TypeError(`TYPE ERROR: Cannot assign ${typeStr(rhs.a)} to ${typeStr(lhs.a)}`);
             }
             
             return { ...s, name: lhs, value: rhs };
@@ -360,8 +390,8 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
         }
         case "return": {
             const valTyp = tcExpr(s.value, envList);
-            if(!isAssignable(currentReturn, valTyp.a)) {
-                throw new TypeError(`TYPE ERROR: ${valTyp.a} returned but ${currentReturn} expected.`);
+            if(!isAssignable(currentReturn, valTyp.a) && !isSubClass(valTyp.a, currentReturn, envList)) {
+                throw new TypeError(`TYPE ERROR: ${typeStr(valTyp.a)} returned but ${typeStr(currentReturn)} expected.`);
             }
             return { ...s, value: valTyp };
         }
@@ -410,7 +440,7 @@ export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
             s.fields.forEach(m => {
                 fields.set(m.var.name, m.var.type)
             })
-            defineNewSymbol(envList, s.name, { tag: "class", type: { methods, fields }});
+            defineNewSymbol(envList, s.name, { tag: "class", type: { super: s.super, methods, fields }});
             }
     })
 

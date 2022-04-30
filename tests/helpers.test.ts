@@ -27,6 +27,9 @@ export function typeCheck(source: string) : Type {
 export async function run(source: string) {
     const wasmSource = compile(source);
     try {
+        (importObject as any).check_if_none = function() {
+            return 0;
+        }
         const v = await runT(wasmSource, importObject);
         return v;
     } catch (err){

@@ -105,5 +105,19 @@ describe('parses type', () => {
             }, 
             body: [{tag: "pass"}]});
     })
+
+
+    it('3', () => {
+        const source = "class B(A):\n    pass";
+        const stmts = parse(source);
+
+        // Note: we have to use deep equality when comparing objects
+        expect(stmts[0]).to.deep.equal({
+            tag: "class", 
+            name: "B", 
+            super: "A",
+            methods: [],
+            fields: []
+    })})
     // TODO: add additional tests here to ensure traverseExpr works as expected
 });

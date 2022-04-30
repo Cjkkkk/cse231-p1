@@ -429,54 +429,117 @@ describe('test functions', () => {
         }
     });
 
-
-    // it('elif expression 1', async () => {
-    //     await runTest(`
-    //         x = 25
-    //         if x < 2:
-    //             print(0)
-    //         elif x < 10:
-    //             print(1)
-    //         elif x > 30:
-    //             print(2)
-    //         else:
-    //             print(3)
-    //     `);
-    //     expect(importObject.output).to.equal("3\n");
-    // });
-
-    // it('elif expression 2', async () => {
-    //     await runTest(`
-    //         x = 5
-    //         if x <= 2:
-    //             x=0
-    //         elif x <= 10:
-    //             y=2
-    //             x=1
-    //         elif x >= 30:
-    //             z=3
-    //             x=2
-    //         else:
-    //             x=3
-    //         print(x)
-    //     `);
-    //     expect(importObject.output).to.equal("1\n");
-    // });
-
-    // it('while expression', async () => {
-    //     await runTest(`
-    //         limit = 100
-    //         x = 1
-    //         while x < limit:
-    //             x = x + 1
-    //         print(x)
-    //     `);
-    //     expect(importObject.output).to.equal("100\n");
-    // });
-
-    // it('prints a unary operation 3', async () => {
-    //     await runTest("y = -5\nx=-y\nprint(x)\nprint(-(-x))");
-    //     expect(importObject.output).to.equal("5\n5\n");
-    // });
-
 });
+
+
+describe('test class', () => {
+    const config = { importObject };
+
+    it('Pass subclass as function argument', async () => {
+        await runTest(`
+            class A(object):
+                pass
+            
+            class B(A):
+                pass
+            
+            def f(a: A):
+                pass
+            b: B = None
+            f(b)
+        `);
+    });
+
+    it('Pass subclass as function return value', async () => {
+        await runTest(`
+            class A(object):
+                pass
+            
+            class B(A):
+                pass
+            
+            def f() -> A:
+                b: B = None
+                return b
+        `);
+    });
+
+
+    it('Pass subclass as method argument with nested inheritance', async () => {
+        await runTest(`
+            class A(object):
+                pass
+            
+            class B(A):
+                pass
+            
+            class C(B):
+                pass
+            
+            class D(object):
+                def dumb(self: D, a: A):
+                    pass
+            
+            d: D = None
+            c: C = None
+            d.dumb(c)
+        `);
+    });
+
+    it('Pass subclass as function argument with nested inheritance', async () => {
+        await runTest(`
+            class A(object):
+                pass
+            
+            class B(A):
+                pass
+            
+            class C(B):
+                pass
+            
+            def f() -> A:
+                c: C = None
+                return c
+        `);
+    });
+
+    it('Pass different class as function argument', async () => {
+        try {
+            await runTest(`
+                class A(object):
+                    pass
+                
+                class B(object):
+                    pass
+                
+                def f(a: A):
+                    pass
+                b: B = None
+                f(b)
+            `);
+            assert(false);
+        } catch (error) {
+            expect(error.name).to.equal("TypeError");
+        }
+    });
+
+
+    it('Pass different class as function return value', async () => {
+        try {
+            await runTest(`
+                class A(object):
+                    pass
+                
+                class B(object):
+                    pass
+                
+                def f() -> A:
+                    b: B = None
+                    return b
+            `);
+            assert(false);
+        } catch (error) {
+            expect(error.name).to.equal("TypeError");
+        }
+    });
+})

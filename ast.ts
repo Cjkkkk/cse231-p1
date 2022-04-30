@@ -15,6 +15,25 @@ export type Type =
     | {tag: "list", type: Type}
     | {tag: "tuple", members: Type[]}
 
+export function typeStr(t: Type): string {
+    switch (t.tag) {
+        case "int":
+        case "bool":
+        case "none":
+            return t.tag;
+        case "class":
+            return t.name;
+        case "callable":
+            return `callable[[${t.params.map((v)=>typeStr(v)).join(", ")}], ${typeStr(t.ret)}]`;
+        case "list":
+            return `list[${typeStr(t.type)}]`;
+        case "tuple":
+            return `tuple[${t.members.map((v)=>typeStr(v)).join(", ")}]`;
+        default:
+            throw new TypeError("TYPE ERROR: Type not supported")
+    }
+}
+
 export function isTypeEqual(lhs: Type, rhs: Type): boolean {
     if (lhs.tag !== rhs.tag) return false;
     else if (lhs.tag === "int" || lhs.tag === "bool" || lhs.tag === "none") return true;
@@ -50,7 +69,7 @@ export type WhileStatement<A> = { a?: A, tag: "while", while: CondBody<A>}
 export type PassStmt<A> = { a?: A, tag: "pass"}
 export type ReturnStmt<A> = { a?: A, tag: "return", value: Expr<A>}
 export type ExprStmt<A> = { a?: A, tag: "expr", expr: Expr<A> }
-export type ClassStmt<A> = { a?: A, tag: "class", name: string, methods: FuncStmt<A>[], fields: VarStmt<A>[]}
+export type ClassStmt<A> = { a?: A, tag: "class", name: string, super: string, methods: FuncStmt<A>[], fields: VarStmt<A>[]}
 
 export type LiteralExpr<A> = { a?: A, tag: "literal", value: Literal } 
 export type NameExpr<A> = { a?: A, tag: "name", name: string}
@@ -61,7 +80,7 @@ export type GetFieldExpr<A> = { a?: A, tag: "getfield", obj: Expr<A>, name: stri
 export type MethodExpr<A> = { a?: A, tag: "method", obj: Expr<A>, name: string, args: Expr<A>[]}
 
 export type Stmt<A> =
-    FuncStmt<A>
+    | FuncStmt<A>
     | VarStmt<A>
     | AssignStmt<A>
     | IfStmt<A>
