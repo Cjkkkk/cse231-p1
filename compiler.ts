@@ -375,7 +375,6 @@ function buildMethodContext(root: Node) : MethodContextMap {
             classContext.mapping.set(m.name, `$${node.cls.name}$${m.name}`);
         })
         currentOffset += classContext.order.length;
-        console.log(classContext.order.map((o) => classContext.mapping.get(o)).join(" "))
     }
 
     return cm;
