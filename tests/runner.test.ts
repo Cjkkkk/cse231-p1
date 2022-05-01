@@ -542,4 +542,37 @@ describe('test class', () => {
             expect(error.name).to.equal("TypeError");
         }
     });
+
+
+    it('Redefine same field in sub class', async () => {
+        try {
+            await runTest(`
+                class A(object):
+                    a: int = 1
+                
+                class B(A):
+                    a: int = 2
+            `);
+            assert(false);
+        } catch (error) {
+            expect(error.name).to.equal("TypeError");
+        }
+    });
+
+
+    // it('reference same field in super class', async () => {
+    //     try {
+    //         await runTest(`
+    //             class A(object):
+    //                 a: int = 1
+                
+    //             class B(A):
+    //                 def f(self: B):
+    //                     self.a = 2
+    //         `);
+    //         assert(false);
+    //     } catch (error) {
+    //         expect(error.message).to.equal("TypeError");
+    //     }
+    // });
 })

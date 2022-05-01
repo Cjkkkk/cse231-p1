@@ -187,17 +187,29 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             if (newObj.a.tag !== "class") {
                 throw new Error("can not get member of non-class")
             } 
-            let className = newObj.a;
-            let [found, t] = lookUpSymbol(envList, className.name, false);
+            let classType = newObj.a;
+            let [found, symbol] = lookUpSymbol(envList, classType.name, false);
             if(!found) {
-                throw new ReferenceError(`class ${className} is not defined`);
+                throw new ReferenceError(`class ${classType.name} is not defined`);
             }
-            if(t.tag !== "class") {
-                throw new ReferenceError(`${className} is not a class name`);
+            if(symbol.tag !== "class") {
+                throw new ReferenceError(`${classType.name} is not a class name`);
             }
-            let classData = t.type;
-            if (!classData.fields.has(e.name)) {
-                throw new ReferenceError(`class ${className} does not have field ${e.name}`)
+
+            let className = classType.name;
+            let classData = symbol.type;
+            while (className !== "object") {
+                if (!classData.fields.has(e.name)) {
+                    className = classData.super;
+                    classData = (lookUpSymbol(envList, className, false)[1] as ClassSymbol).type;
+                } else {
+                    break;
+                }
+            }
+
+            if (className === "object") {
+                // can not find field in class or any super class
+                throw new ReferenceError(`class ${classType.name} does not have field ${e.name}`)
             }
 
             return { ...e, a: classData.fields.get(e.name), obj: newObj };
@@ -207,16 +219,32 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             if (newObj.a.tag !== "class") {
                 throw new Error("can not call method on non-class")
             }
-            let className = newObj.a;
-            let [found, t] = lookUpSymbol(envList, className.name, false);
+            let classType = newObj.a;
+            let [found, symbol] = lookUpSymbol(envList, classType.name, false);
             if(!found) {
-                throw new ReferenceError(`class ${className} is not defined`);
+                throw new ReferenceError(`class ${classType.name} is not defined`);
             }
-            if(t.tag !== "class") {
-                throw new ReferenceError(`${className} is not a class name`);
+            if(symbol.tag !== "class") {
+                throw new ReferenceError(`${classType.name} is not a class name`);
             }
-            let classData = t.type;
-        
+
+            let className = classType.name;
+            let classData = symbol.type;
+            // track all the super class
+            while (className !== "object") {
+                if (!classData.methods.has(e.name) 
+                    && (!classData.fields.has(e.name) || classData.fields.get(e.name).tag !== "callable")) {
+                    className = classData.super;
+                    classData = (lookUpSymbol(envList, className, false)[1] as ClassSymbol).type;
+                } else {
+                    break;
+                }
+            }
+            
+            if (className === "object") {
+                throw new ReferenceError(`class ${classType.name} does not have method ${e.name} or callable field ${e.name}`)
+            }
+
             // should be able to function pointers too
             let args: Type[];
             let ret: Type;
@@ -224,16 +252,14 @@ export function tcExpr(e : Expr<any>, envList : SymbolTableList) : Expr<Type> {
             if (classData.methods.has(e.name)) {
                 isClassMethod = 1;
                 [args, ret] = classData.methods.get(e.name);
-            } else if(classData.fields.has(e.name) && classData.fields.get(e.name).tag === "callable"){
+            } else {
                 isClassMethod = 0;
                 const callableType = (classData.fields.get(e.name) as {tag: "callable", params: Type[], ret: Type});
                 [args, ret] = [callableType.params, callableType.ret];
-            } else {
-                throw new ReferenceError(`class ${className} does not have method ${e.name} or callable field ${e.name}`)
             }
 
             if(args.length !== e.args.length + isClassMethod) {
-                throw new Error(`Expected ${args.length} arguments but got ${e.args.length + 1}`);
+                throw new Error(`Expected ${args.length} arguments but got ${e.args.length + isClassMethod}`);
             }
             
             // exclude self
@@ -294,8 +320,26 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
 
         case "class": {
             // TODO: check if redefine class or method or field!
-            const fields = s.fields.map((v)=>tcVarStmt(v, envList, currentReturn)); //TODO: pass class info
-            const methods = s.methods.map((v)=>tcFuncStmt(v, envList, currentReturn));
+            // TODO: add super class fields into this
+            const [found, superClassSymbol] = lookUpSymbol(envList, s.super, false);
+            if (!found || superClassSymbol.tag !== "class") {
+                throw new TypeError(`Class ${s.super} is not defined`)
+            }
+
+            let className = s.super;
+            let classData = superClassSymbol.type;
+            // track all the super class
+            while (className !== "object") {
+                if (!s.fields.some((f)=>classData.fields.has(f.var.name))) {
+                    className = classData.super;
+                    classData = (lookUpSymbol(envList, className, false)[1] as ClassSymbol).type;
+                } else {
+                    throw new TypeError(`TYPE ERROR: Redefine field in class ${s.name}`);
+                }
+            }
+
+            let fields = s.fields.map((v)=>tcVarStmt(v, envList, currentReturn)); //TODO: pass class info
+            let methods = s.methods.map((v)=>tcFuncStmt(v, envList, currentReturn));
             methods.forEach((m)=>{
                 if (m.name === "__init__") {
                     if (m.params.length !== 1 || m.params[0].name !== "self" || m.ret.tag !== "none") {
@@ -310,6 +354,17 @@ export function tcStmt(s : Stmt<any>, envList: SymbolTableList, currentReturn : 
                     m.ret = {tag: "class", name: s.name};
                 }
             })
+
+            if (!methods.some((m)=> m.name === "__init__")) {
+                const initFunc = {
+                    tag: "func", 
+                    name: "__init__", 
+                    params: [{name: "self", type: {tag: "class", name: s.name}}],
+                    ret: {tag: "class", name: s.name},
+                    body: [{tag: "return", value: {tag: "name", name: "self"}}]
+                } as FuncStmt<any>;
+                methods = [initFunc].concat(methods);
+            }
             return {
                 ...s,
                 fields,
@@ -430,6 +485,7 @@ export function tcProgram(p : Stmt<any>[]) : Stmt<Type>[] {
     // check if all definition are proceeding statements
     checkDefinition(p);
     // define all the functions and variables
+    defineNewSymbol(envList, "object", {tag: "class", type: {super: "", methods: new Map<string, [Type[], Type]>(), fields: new Map<string, Type>()}});
     p.forEach(s => {
         if (s.tag === "func") {
             defineNewSymbol(envList, s.name, {tag: "func", type: [s.params.map(p => p.type), s.ret]});
