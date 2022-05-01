@@ -20,7 +20,6 @@ def f1() -> A:
 
 c: C = None
 a: A = None
-c = C()
 a = f1()
 print(f(c))
 print(f(a))

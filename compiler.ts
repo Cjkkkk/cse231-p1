@@ -139,8 +139,10 @@ export function codeGenExpr(expr : Expr<Type>, locals: Env, fcm: FieldContexMap,
             const mc = mcm.get(className);
             return [
                 ...objStmts, // self
+                `local.set $scratch`,
+                `local.get $scratch`,
                 ...argsStmts,
-                ...objStmts, // self
+                `local.get $scratch`, // self
                 `i32.load`, // get v_table pointer
                 `i32.const ${mc.order.indexOf(expr.name)}`, // offset
                 `i32.add`, // get index into the table

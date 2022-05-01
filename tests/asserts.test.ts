@@ -19,7 +19,6 @@ before(function () {
 export function assertPrint(name: string, source: string, expected: Array<string>) {
   it(name, async () => {
     await run(source);
-    const output = importObject.output;
     expect(importObject.output.trim().split("\n")).to.deep.eq(expected);
   });
 }

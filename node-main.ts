@@ -33,7 +33,7 @@ const importObject = {
             return arg;
         },
         print_none: (arg: any) => {
-            console.log(arg)
+            console.log("None")
             importObject.output += "None";
             importObject.output += "\n";
             return arg;

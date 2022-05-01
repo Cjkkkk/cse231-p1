@@ -1,32 +1,11 @@
 import { compile, run } from '../compiler';
 import { expect, assert } from 'chai';
+import { importObject } from './import-object.test';
 import 'mocha';
 
 function runTest(source: string) {
     return run(compile(source), importObject);
 }
-
-const importObject = {
-    imports: {
-        // we typically define print to mean logging to the console. To make testing
-        // the compiler easier, we define print so it logs to a string object.
-        //  We can then examine output to see what would have been printed in the
-        //  console.
-        print_num: (arg: any) => {
-            importObject.output += arg + "\n";
-        },
-        print_bool: (arg: any) => {
-            if (arg !== 0) { importObject.output += "True"; }
-            else { importObject.output += "False"; }
-            importObject.output += "\n";
-        },
-        print_none: (arg: any) => {
-            importObject.output += "None\n";
-        }
-    },
-
-    output: ""
-};
 
 // Clear the output before every test
 beforeEach(function () {
@@ -482,6 +461,7 @@ describe('test class', () => {
             
             d: D = None
             c: C = None
+            d = D()
             d.dumb(c)
         `);
     });

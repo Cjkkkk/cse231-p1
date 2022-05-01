@@ -193,6 +193,21 @@ def f1(a:List[int]) -> Callable[[int], int]:
 def f2(a:Tuple[int, int]) -> Callable[[int], Callable[[int], int]]:
     pass
 `
+
+source = `
+class C(object):
+    x : int = 123
+    def new(self: C, x: int) -> C:
+        print(self.x)
+        self.x = x
+        print(self.x)
+        return self
+
+    def clear(self: C) -> C:
+        return self.new(123)
+
+C().new(42).clear()
+`
 const t = parser.parse(source);
 console.log(stringifyTree(t.cursor(), source, 0));
 

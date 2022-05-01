@@ -1,4 +1,4 @@
-import {    assertPrint, assertFail, assertTCFail, assertTC } from "./asserts.test";
+import { assertPrint, assertFail, assertTCFail, assertTC } from "./asserts.test";
 import { NUM, NONE, CLASS } from "./helpers.test"
 
 describe("PA3 visible tests", () => {
